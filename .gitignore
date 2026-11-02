@@ -1,0 +1,17 @@
+# dependências e builds (cada app tem o seu .gitignore com o resto)
+node_modules/
+
+# env
+.env
+.env.*
+!.env.example
+
+# IDEs e SO
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+*.log
+
+# configurações locais do Claude Code
+.claude/settings.local.json
