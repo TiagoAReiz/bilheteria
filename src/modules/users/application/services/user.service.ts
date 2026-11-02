@@ -18,6 +18,10 @@ export class UserService implements UserServicePort {
     }
   }
 
+  async becomeOrganizer(userId: string): Promise<void> {
+    await this.userRepository.promoteToOrganizer(userId);
+  }
+
   async hasCpf(userId: string): Promise<boolean> {
     return (await this.userRepository.getCpfHashById(userId)) !== null;
   }

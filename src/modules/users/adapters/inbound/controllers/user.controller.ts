@@ -17,4 +17,10 @@ export class UserController {
   registerCpf(@Session() session: UserSession, @Body() dto: CpfDto) {
     return this.userService.registerCpf(session.user.id, dto.cpf);
   }
+
+  @Patch("me/organizer")
+  @HttpCode(204)
+  becomeOrganizer(@Session() session: UserSession) {
+    return this.userService.becomeOrganizer(session.user.id);
+  }
 }

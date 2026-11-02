@@ -2,6 +2,7 @@ import {ConflictException, Injectable, NotFoundException} from "@nestjs/common";
 import {Prisma} from "../../../../../generated/prisma/client.js";
 import {PrismaService} from "../../../../prisma/prisma.service.js";
 import {UserRepositoryPort} from "../../../application/ports/outbound/repositories/user.repository.port.js";
+import {Role} from "../../../core/entities/role.js";
 
 @Injectable()
 export class UserRepository implements UserRepositoryPort {
@@ -26,5 +27,10 @@ export class UserRepository implements UserRepositoryPort {
             }
             throw e;
         }
+    }
+
+    async promoteToOrganizer(id: string): Promise<void> {
+        // so promove USER: ADMIN nunca e rebaixado e ORGANIZER ja esta no lugar
+        await this.prisma.user.updateMany({where: {id, role: Role.USER}, data: {role: Role.ORGANIZER}});
     }
 }
