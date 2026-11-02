@@ -136,10 +136,12 @@ Dependências entre módulos: `ticket` usa as portas inbound de `users` (`USER_S
 
 ## Setup
 
+Comandos rodados dentro de `backend/`. Para subir tudo pela raiz, veja o [README do monorepo](../README.md).
+
 ```bash
 npm install
 cp .env.example .env        # preencher as variáveis
-docker compose up -d        # postgres
+docker compose -f ../docker-compose.yaml up -d   # postgres (compose fica na raiz do monorepo)
 npx prisma migrate dev --config prisma7.config.ts
 npm run start:dev
 ```
