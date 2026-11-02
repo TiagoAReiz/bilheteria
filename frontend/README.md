@@ -1,0 +1,110 @@
+# Bilheteria — Front
+
+Front-end em Next.js (App Router) da [API Bilheteria](../bilheteria) (NestJS + Better Auth): lista eventos, mostra disponibilidade, reserva ingressos, cadastro de CPF, perfil de organizador e criação de eventos.
+
+**Stack:** Next.js 16 (App Router, Turbopack) · TypeScript · Tailwind CSS v4 · shadcn/ui (Radix) · axios · react-hook-form + zod · sonner (toasts) · Jest + React Testing Library.
+
+## Como rodar
+
+```bash
+npm install
+cp .env.example .env.local   # ajuste a URL da API se precisar
+npm run dev                  # http://localhost:3001
+```
+
+A API precisa estar rodando (padrão `http://localhost:3000`) com `FRONTEND_URL=http://localhost:3001` no `.env` dela, que libera CORS com cookies e o callback do OAuth.
+
+## Variáveis de ambiente
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | URL base da API NestJS (usada pela instância axios) |
+
+## Scripts
+
+| Script | O que faz |
+| --- | --- |
+| `npm run dev` | servidor de desenvolvimento na porta **3001** |
+| `npm run build` | build de produção |
+| `npm run start` | sobe o build de produção na porta **3001** |
+| `npm run lint` | ESLint (config do Next) |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | testes com Jest (`npm run test:watch` para modo watch) |
+
+## Organização de pastas
+
+```
+src/
+├── app/                         # rotas (App Router); os page.tsx só compõem componentes dos módulos
+│   ├── layout.tsx               # layout raiz: fontes, <Providers> (sessão + Toaster)
+│   ├── globals.css              # Tailwind + tema do shadcn
+│   ├── (public)/                # layout com header
+│   │   ├── page.tsx             # /             próximos eventos
+│   │   ├── events/[id]/page.tsx # /events/:id   detalhe + reserva
+│   │   └── login/page.tsx       # /login
+│   └── (private)/               # layout com header + sidebar fixos; exige login
+│       ├── profile/page.tsx     # /profile
+│       └── events/new/page.tsx  # /events/new   (ORGANIZER/ADMIN)
+├── modules/                     # um módulo por página/feature
+│   ├── events/                  # lista da home
+│   ├── event-detail/            # detalhe, status dos ingressos e reserva
+│   ├── login/                   # login social
+│   ├── profile/                 # perfil, CPF, virar organizador
+│   └── new-event/               # formulário de criação de evento
+│       ├── components/          # componentes da página
+│       ├── services/            # chamadas ao backend (axios)
+│       ├── types/               # DTOs de request/response (e schema zod do formulário)
+│       ├── hooks/               # estado/comportamento (useEvents, useReserveTicket, ...)
+│       └── __tests__/           # testes do módulo
+├── shared/                      # o que é usado em mais de um lugar
+│   ├── components/
+│   │   ├── ui/                  # componentes gerados pelo shadcn
+│   │   ├── layout/              # AppHeader, PrivateSidebar, RequireSession
+│   │   ├── providers.tsx
+│   │   └── user-avatar.tsx
+│   ├── services/                # api.ts (instância axios única) e session.service.ts
+│   ├── hooks/                   # useSession (contexto de sessão), useAsync
+│   ├── types/                   # User/Role, EventResponse, Session
+│   ├── lib/                     # cn, api-error, auth-redirect, cpf, format, env, navigation
+│   └── __tests__/
+├── __tests__/proxy.test.ts
+└── proxy.ts                     # proteção das rotas privadas (no Next 16 o "middleware" se chama proxy)
+jest/                            # setup do Jest e helpers de teste (alias @test/*)
+```
+
+Não existe `src/pages/`: essa pasta ativaria o Pages Router legado. As "páginas" ficam em `src/app/`, organizadas nos route groups `(public)` e `(private)`, que não aparecem na URL.
+
+### shadcn/ui
+
+O `components.json` gera os componentes em `@/shared/components/ui` e usa o util `cn` de `@/shared/lib/utils`. Para adicionar um componente:
+
+```bash
+npx shadcn@latest add dialog
+```
+
+> Importante: a versão 4.x do CLI às vezes escreve `import { cn } from "cn"` (um pacote npm). Depois de rodar `add`, troque para `@/shared/lib/utils`.
+
+## Autenticação
+
+- Login social pelo Better Auth: `POST /api/auth/sign-in/social` devolve a URL do provedor e o navegador é redirecionado para ela. O `callbackURL` é a URL absoluta do front, com o `?redirect=` original.
+- A sessão fica num cookie httpOnly da API. Por isso o axios usa `withCredentials: true`.
+- `src/proxy.ts` faz uma checagem **otimista**: se não houver o cookie `better-auth.session_token` (ou `__Secure-better-auth.session_token` em HTTPS) em `/profile` ou `/events/new`, redireciona para `/login?redirect=<rota>`. A regra fica em `shared/lib/auth-redirect.ts`, uma função pura e testada.
+- A validação de verdade é do backend. Se uma chamada voltar 401, o interceptor do axios manda para `/login`. No cliente, o `RequireSession` do layout privado também redireciona quando `get-session` volta vazio (cookie expirado).
+- O proxy só enxerga o cookie quando front e API estão no mesmo host (ex.: `localhost:3001` e `localhost:3000`; cookies não levam a porta em conta). Em produção, use subdomínios do mesmo domínio ou um proxy reverso.
+
+## Erros
+
+Os erros do Nest vêm como `{ statusCode, message, error }`. `getErrorMessage()` (em `shared/lib/api-error.ts`) extrai a mensagem, aceitando `message` como string ou array, e as telas mostram essa mensagem em toast (sonner) e/ou em alerta.
+
+## Testes
+
+Os testes ficam em pastas `__tests__/` dentro de cada módulo, em `shared/` e em `src/__tests__` (proxy). Eles cobrem:
+
+- services: o axios é mockado e os testes conferem URL e body;
+- hooks: `renderHook`;
+- componentes: lista de eventos, botão de reserva (403/404/409/sucesso), formulário de CPF, formulário e guarda de criação de evento, login e perfil;
+- regras do proxy, com uma função pura e o `proxy()` executado com `NextRequest`.
+
+```bash
+npm test
+```
