@@ -8,6 +8,8 @@ async function bootstrap() {
     bodyParser: false,
   });
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
+  // o front manda o cookie de sessao do better auth em todas as rotas, nao so em /api/auth
+  app.enableCors({ origin: process.env.FRONTEND_URL, credentials: true });
   app.enableShutdownHooks()
   await app.listen(process.env.PORT ?? 3000);
 }

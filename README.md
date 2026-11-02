@@ -151,7 +151,7 @@ Variáveis (ver `.env.example`):
 | `DATABASE_URL` | conexão do Postgres |
 | `BETTER_AUTH_SECRET` | assinatura das sessões (`openssl rand -base64 32`) |
 | `BETTER_AUTH_URL` | URL pública da API |
-| `FRONTEND_URL` | origem confiável do front (CORS das rotas de auth) |
+| `FRONTEND_URL` | origem do front (CORS com cookies em todas as rotas), ex.: `http://localhost:3001` |
 | `CPF_HASH_SECRET` | chave do HMAC do CPF; trocar invalida os hashes existentes |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth Google |
 | `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | OAuth Facebook |
