@@ -19,6 +19,7 @@ model user {
     emailVerified Boolean   @default(false) @map("email_verified")
     image         String?
     role          Role      @default(USER)
+    cpfHash       String?   @unique @map("cpf_hash")
     createdAt     DateTime  @default(now()) @map("created_at")
     updatedAt     DateTime  @updatedAt @map("updated_at")
     sessions      session[]

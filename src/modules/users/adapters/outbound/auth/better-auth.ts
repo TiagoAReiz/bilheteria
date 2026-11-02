@@ -26,6 +26,7 @@ export function createAuth(prisma: PrismaService, config: ConfigService) {
         user: {
             additionalFields: {
                 role: {type: "string", defaultValue: Role.USER, input: false},
+                cpfHash: {type: "string", required: false, input: false, returned: false},
             },
         },
     });

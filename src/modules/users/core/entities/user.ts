@@ -7,6 +7,7 @@ export class User{
     emailVerified: boolean;
     image?: string | null;
     role: Role;
+    cpfHash: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
