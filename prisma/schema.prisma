@@ -12,6 +12,21 @@ enum Role {
   ORGANIZER
 }
 
+model event{
+    id Int @id @default(autoincrement())
+    name String
+    description String?
+    location String
+    starts_at DateTime
+    capacity Int
+    organizer_id String
+    organizer user @relation(fields: [organizer_id], references: [id])
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    deleted_at DateTime?
+
+    @@index([starts_at])
+}
 model user {
     id            String    @id
     name          String
@@ -24,6 +39,7 @@ model user {
     updatedAt     DateTime  @updatedAt @map("updated_at")
     sessions      session[]
     accounts      account[]
+    events        event[]
 
     @@map("users")
 }
