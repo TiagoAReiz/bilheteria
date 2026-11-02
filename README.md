@@ -168,3 +168,28 @@ npm run test         # testes unitários (vitest)
 npm run test:e2e     # testes e2e
 npm run test:load    # teste de carga (API rodando)
 ```
+
+## Próximos passos
+
+1. **Observabilidade com Grafana**
+   - OpenTelemetry no NestJS (`sdk-node`, auto-instrumentations, `@prisma/instrumentation`) e logs com `nestjs-pino` correlacionados ao trace.
+   - Grafana Alloy como coletor; Prometheus (métricas), Loki (logs) e Tempo (traces); `postgres_exporter` e cAdvisor.
+   - Grafana Faro no front (erros JS e Web Vitals).
+   - Métricas de negócio: reservas por resultado (`reserved`, `limit_reached`, `sold_out`), duração da reserva, conversão reserva → pagamento.
+   - Dashboards (API RED, Postgres, negócio) e alertas (5xx, p95 do `/reservation`, pool de conexões, slot de replicação).
+2. **Busca com Elasticsearch + Sequin (CDC, sem Kafka)**
+   - Postgres com `wal_level=logical` e publicação das tabelas; Sequin enviando mudanças direto para o Elasticsearch, com backfill.
+   - Índice `events` com analisador pt-BR (sem acento, stemming), autocomplete e filtros (cidade, data, disponibilidade).
+   - `available` atualizado em lote na tabela `event` (não sincronizar cada reserva); `GET /events/search`.
+   - Postgres segue como fonte da verdade: reserva e limite por usuário continuam no Postgres.
+3. **Pagamento com Mercado Pago**
+   - Criar a cobrança na reserva, com o ticket/usuário nos metadados.
+   - Webhook aceito **somente** do Mercado Pago, com validação de assinatura (`x-signature` + segredo); consultar o pagamento na API do Mercado Pago antes de confirmar.
+   - Confirmação idempotente (notificação repetida de ticket já pago não pode falhar).
+   - Hoje o `POST /webhook/ticket/payment` é público e sem assinatura: qualquer um com `id` + `user_id` marca o ticket como pago. Precisa ser fechado nessa etapa.
+
+### Pendências encontradas pelos testes
+- `GET /status/:id`: `reserved` inclui ingressos pagos (`total - available`).
+- `TicketRepository.updateTicket`: o 404 nunca acontece (Prisma lança P2025), devolve o objeto recebido e envia `id`/`event_id` no `data`.
+- Status usa `Date.now()` da aplicação e a reserva usa `NOW()` do Postgres.
+- DTOs: `event_id` aceita 0/negativo, `user_id` do webhook aceita string vazia, `capacity` em string é rejeitado.
