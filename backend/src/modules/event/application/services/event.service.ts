@@ -1,7 +1,8 @@
-import {Inject, Injectable} from '@nestjs/common';
+import {ConflictException, ForbiddenException, Inject, Injectable} from '@nestjs/common';
 import {Event} from "../../core/entities/event.entity.js";
 import {NewEvent} from "../../core/entities/new-event.entity.js";
 import {EventDetailView, EventView, toEventView, toPhotoViews} from "../../core/entities/event-image.entity.js";
+import {checkEventUpdate, EventChanges, EventEditor, EventUpdateRejection} from "../../core/entities/event-update.js";
 import {EventServicePort} from "../ports/inbound/services/event.service.port.js";
 import {EVENT_REPOSITORY, type EventRepositoryPort} from "../ports/outbound/repositories/event.repository.port.js";
 import {EVENT_METRICS, type EventMetricsPort} from "../ports/outbound/metrics/event-metrics.port.js";
@@ -39,6 +40,31 @@ export class EventService implements EventServicePort {
 
   async getEventIdsByOrganizer(organizerId: string): Promise<number[]> {
     return this.eventRepository.getEventIdsByOrganizer(organizerId);
+  }
+
+  async updateEvent(id: number, editor: EventEditor, changes: EventChanges): Promise<EventView> {
+    const result = await this.eventRepository.updateWithTickets(
+        id, changes, (current) => checkEventUpdate(current, changes, editor, new Date()),
+    );
+    if (result.outcome === 'rejected') {
+      throw this.rejection(result.reason);
+    }
+    return this.toView(result.event);
+  }
+
+  private rejection(reason: EventUpdateRejection): Error {
+    switch (reason) {
+      case 'forbidden':
+        return new ForbiddenException('Só o organizador do evento pode editá-lo');
+      case 'event_started':
+        return new ConflictException('O evento já começou e não pode mais ser editado');
+      case 'capacity_decrease':
+        return new ConflictException('A capacidade não pode diminuir, só aumentar');
+      case 'limit_decrease':
+        return new ConflictException('O limite de ingressos por CPF não pode diminuir, só aumentar');
+      case 'limit_above_capacity':
+        return new ConflictException('O limite de ingressos por CPF não pode ser maior que a capacidade');
+    }
   }
 
   private toView(event: Event): EventView {

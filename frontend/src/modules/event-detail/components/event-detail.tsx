@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, BanknoteIcon, CalendarIcon, MapPinIcon, TicketIcon, UsersIcon } from "lucide-react";
+import { ArrowLeftIcon, BanknoteIcon, CalendarIcon, MapPinIcon, PencilIcon, TicketIcon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
@@ -118,6 +118,13 @@ function EventDetailContent({
             {soldOut ? <Badge variant="destructive">Esgotado</Badge> : null}
             {started ? <Badge variant="secondary">Vendas encerradas</Badge> : null}
             {notOnSale && !started ? <Badge variant="secondary">Vendas indisponíveis</Badge> : null}
+            {canEdit && !started ? (
+              <Button asChild variant="outline" size="sm" className="ml-auto">
+                <Link href={`/events/${event.id}/edit`}>
+                  <PencilIcon aria-hidden /> Editar evento
+                </Link>
+              </Button>
+            ) : null}
           </div>
           <div className="space-y-1 text-sm text-muted-foreground">
             <p className="flex items-center gap-2">

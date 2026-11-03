@@ -3,6 +3,7 @@ import {PrismaService} from "../../../../prisma/prisma.service.js";
 import {Event} from "../../../core/entities/event.entity.js";
 import {NewEvent} from "../../../core/entities/new-event.entity.js";
 import {EventWithPhotos} from "../../../core/entities/event-image.entity.js";
+import {EventChanges, EventUpdateRejection, EventUpdateResult} from "../../../core/entities/event-update.js";
 import {EventRepositoryPort} from "../../../application/ports/outbound/repositories/event.repository.port.js";
 
 @Injectable()
@@ -28,6 +29,45 @@ export class EventRepository implements EventRepositoryPort {
                     createMany: {data: Array.from({length: event.capacity}, () => ({is_paid: false}))},
                 },
             },
+        });
+    }
+
+    async updateWithTickets(
+        id: number,
+        changes: EventChanges,
+        check: (current: Event) => EventUpdateRejection | null,
+    ): Promise<EventUpdateResult> {
+        return await this.prisma.$transaction(async (tx) => {
+            // trava o evento: duas edições simultâneas não leem a mesma capacidade e criam ingressos em dobro
+            await tx.$queryRaw`SELECT id FROM event WHERE id = ${id} AND deleted_at IS NULL FOR UPDATE`;
+            const current = await tx.event.findFirst({where: {id, deleted_at: null}});
+            if (!current) {
+                throw new NotFoundException(`O evento ${id} não foi encontrado`);
+            }
+            const reason = check(current);
+            if (reason) {
+                return {outcome: 'rejected', reason};
+            }
+
+            const added = changes.capacity === undefined ? 0 : changes.capacity - current.capacity;
+            if (added > 0) {
+                await tx.ticket.createMany({data: Array.from({length: added}, () => ({event_id: id, is_paid: false}))});
+            }
+            const event = await tx.event.update({
+                where: {id},
+                data: {
+                    name: changes.name,
+                    description: changes.description,
+                    location: changes.location,
+                    starts_at: changes.starts_at,
+                    capacity: changes.capacity,
+                    price_cents: changes.price_cents,
+                    max_tickets_per_cpf: changes.max_tickets_per_cpf,
+                    // os ingressos novos nascem livres; o job de disponibilidade acerta o resto
+                    ...(added > 0 ? {available_tickets: {increment: added}} : {}),
+                },
+            });
+            return {outcome: 'updated', event};
         });
     }
 

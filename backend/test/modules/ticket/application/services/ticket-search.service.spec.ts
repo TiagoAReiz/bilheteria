@@ -35,6 +35,7 @@ describe('TicketSearchService', () => {
       getEventById: vi.fn(),
       getEventDetail: vi.fn(),
       getEventIdsByOrganizer: vi.fn().mockResolvedValue([3, 8]),
+      updateEvent: vi.fn(),
     };
 
     const module = await Test.createTestingModule({

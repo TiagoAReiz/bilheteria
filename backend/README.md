@@ -120,12 +120,14 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 - Listagem mostra só eventos futuros e não excluídos (`deleted_at`).
 - `price_cents`: preço único do ingresso em centavos de BRL, obrigatório, inteiro de 100 (R$ 1,00) a 10.000.000 (R$ 100.000,00). Eventos anteriores ao pagamento têm `null` (sem venda; ver [payment](#payment)).
 - `max_tickets_per_cpf`: quantos ingressos ativos um mesmo CPF pode ter no evento, obrigatório, inteiro de 1 a 10 e no máximo `capacity` (CHECK `event_max_tickets_per_cpf_range` no banco).
+- **Edição** (`PATCH /events/:id`): só o organizador dono ou um `ADMIN`, e só antes do evento começar (409 depois). A **capacidade e o limite por CPF só aumentam** (409 se diminuírem): diminuir a capacidade apagaria ingressos que podem estar reservados ou pagos, e a escolha do limite por CPF é irreversível para baixo (quem comprou contando com ele nunca fica acima). O limite continua <= capacidade. As regras rodam com a linha do evento travada (`FOR UPDATE`); aumentar a capacidade cria os ingressos novos e soma em `available_tickets` na mesma transação. Mudar o preço não altera checkouts já abertos (a order guarda o valor da hora em que foi criada).
 
 - **Imagens**: uma capa (`event.cover_key`) e uma galeria de até 10 fotos (`event_photo`, ordenadas por `position`). Só o organizador que criou o evento ou um `ADMIN` mexem (403 para os demais, 404 para evento inexistente/excluído). As respostas trazem `cover_url` (e `photos` no detalhe), nunca a chave. Fluxo e regras em [Armazenamento de imagens](#armazenamento-de-imagens).
 
 | Método | Rota | Auth | Descrição |
 | --- | --- | --- | --- |
 | POST | `/events` | `ORGANIZER`/`ADMIN` | `{ name, description?, location, starts_at, capacity, price_cents, max_tickets_per_cpf }` |
+| PATCH | `/events/:id` | dono do evento ou `ADMIN` | edita `{ name?, description?, location?, starts_at?, capacity?, price_cents?, max_tickets_per_cpf? }` (só os enviados mudam; `description: null` apaga) |
 | GET | `/events` | não | próximos eventos (com `cover_url`) |
 | GET | `/events/:id` | não | detalhe do evento com `cover_url` e `photos: [{ id, url, position }]` em ordem |
 | POST | `/events/:id/cover/upload-url` | dono/`ADMIN` | `{ content_type }` → POST pré-assinado |

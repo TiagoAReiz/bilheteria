@@ -90,6 +90,7 @@ describe('TicketService', () => {
       getEventById: vi.fn().mockResolvedValue(makeEvent()),
       getEventDetail: vi.fn(),
       getEventIdsByOrganizer: vi.fn(),
+      updateEvent: vi.fn(),
     };
 
     metrics = {

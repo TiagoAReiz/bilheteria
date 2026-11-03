@@ -14,6 +14,12 @@ describe('EventRepository', () => {
       findFirst: Mock;
     };
     $executeRaw: Mock;
+    $transaction: Mock;
+  };
+  let tx: {
+    $queryRaw: Mock;
+    event: { findFirst: Mock; update: Mock };
+    ticket: { createMany: Mock };
   };
   let repository: EventRepository;
 
@@ -21,6 +27,12 @@ describe('EventRepository', () => {
     prisma = {
       event: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
       $executeRaw: vi.fn(),
+      $transaction: vi.fn(async (callback: (t: typeof tx) => unknown) => callback(tx)),
+    };
+    tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      event: { findFirst: vi.fn(), update: vi.fn() },
+      ticket: { createMany: vi.fn() },
     };
     repository = new EventRepository(prisma as unknown as PrismaService);
   });
@@ -214,6 +226,68 @@ describe('EventRepository', () => {
       expect(sqlOf()).toContain(
         'WHERE ev.deleted_at IS NULL AND ev.starts_at > NOW()',
       );
+    });
+  });
+
+  describe('updateWithTickets', () => {
+    const current = {
+      id: 7,
+      capacity: 3,
+      max_tickets_per_cpf: 2,
+      organizer_id: 'org-1',
+    };
+
+    it('trava o evento, cria os ingressos novos e soma em available_tickets', async () => {
+      tx.event.findFirst.mockResolvedValue(current);
+      tx.event.update.mockResolvedValue({ ...current, capacity: 5 });
+      const check = vi.fn().mockReturnValue(null);
+
+      await expect(
+        repository.updateWithTickets(7, { capacity: 5, name: 'Novo' }, check),
+      ).resolves.toEqual({ outcome: 'updated', event: { ...current, capacity: 5 } });
+
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(String(tx.$queryRaw.mock.calls[0][0].join('?'))).toContain('FOR UPDATE');
+      expect(check).toHaveBeenCalledWith(current);
+      expect(tx.ticket.createMany).toHaveBeenCalledWith({
+        data: [
+          { event_id: 7, is_paid: false },
+          { event_id: 7, is_paid: false },
+        ],
+      });
+      expect(tx.event.update).toHaveBeenCalledWith({
+        where: { id: 7 },
+        data: expect.objectContaining({
+          name: 'Novo',
+          capacity: 5,
+          available_tickets: { increment: 2 },
+        }),
+      });
+    });
+
+    it('sem aumento de capacidade não cria ingressos nem mexe em available_tickets', async () => {
+      tx.event.findFirst.mockResolvedValue(current);
+      tx.event.update.mockResolvedValue(current);
+
+      await repository.updateWithTickets(7, { max_tickets_per_cpf: 3 }, () => null);
+
+      expect(tx.ticket.createMany).not.toHaveBeenCalled();
+      expect(tx.event.update.mock.calls[0][0].data).not.toHaveProperty('available_tickets');
+    });
+
+    it('recusa sem gravar nada quando a regra recusa', async () => {
+      tx.event.findFirst.mockResolvedValue(current);
+
+      await expect(
+        repository.updateWithTickets(7, { capacity: 2 }, () => 'capacity_decrease'),
+      ).resolves.toEqual({ outcome: 'rejected', reason: 'capacity_decrease' });
+      expect(tx.ticket.createMany).not.toHaveBeenCalled();
+      expect(tx.event.update).not.toHaveBeenCalled();
+    });
+
+    it('NotFound para evento inexistente ou excluído', async () => {
+      tx.event.findFirst.mockResolvedValue(null);
+      await expect(repository.updateWithTickets(9, {}, () => null)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

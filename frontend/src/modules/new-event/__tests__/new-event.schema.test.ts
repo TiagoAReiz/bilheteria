@@ -1,4 +1,11 @@
-import { newEventSchema, toCreateEventRequest } from "../types/new-event.schema";
+import { makeEvent } from "@test/helpers";
+import {
+  centsToReaisInput,
+  makeEventSchema,
+  newEventSchema,
+  toCreateEventRequest,
+  toEventFormValues,
+} from "../types/new-event.schema";
 
 const valid = {
   name: "Show",
@@ -86,5 +93,43 @@ describe("newEventSchema", () => {
       "max_tickets_per_cpf: O limite por CPF não pode ser maior que a capacidade",
     ]);
     expect(issues({ ...valid, capacity: 3, max_tickets_per_cpf: 3 })).toEqual([]);
+  });
+
+  describe("edição (makeEventSchema com pisos)", () => {
+    const edit = makeEventSchema({ minCapacity: 50, minTicketsPerCpf: 3 });
+    const editIssues = (values: unknown) => {
+      const r = edit.safeParse(values);
+      return r.success ? [] : r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+    };
+
+    it("aceita manter ou aumentar", () => {
+      expect(editIssues({ ...valid, capacity: 50, max_tickets_per_cpf: 3 })).toEqual([]);
+      expect(editIssues({ ...valid, capacity: 80, max_tickets_per_cpf: 10 })).toEqual([]);
+    });
+
+    it("recusa diminuir capacidade ou limite", () => {
+      expect(editIssues({ ...valid, capacity: 49, max_tickets_per_cpf: 3 })).toEqual([
+        "capacity: A capacidade não pode diminuir (mínimo 50)",
+      ]);
+      expect(editIssues({ ...valid, capacity: 50, max_tickets_per_cpf: 2 })).toEqual([
+        "max_tickets_per_cpf: O limite por CPF não pode diminuir (mínimo 3)",
+      ]);
+    });
+  });
+
+  it("toEventFormValues converte o evento da API para o formulário", () => {
+    const values = toEventFormValues(
+      makeEvent({ description: null, price_cents: 123456, starts_at: new Date(2099, 5, 1, 20, 5).toISOString() }),
+    );
+    expect(values).toMatchObject({ description: "", price: "1234,56", starts_at: "2099-06-01T20:05" });
+    expect(toEventFormValues(makeEvent({ price_cents: null })).price).toBe("");
+  });
+
+  it.each([
+    [5000, "50,00"],
+    [8990, "89,90"],
+    [105, "1,05"],
+  ])("centsToReaisInput(%p) = %p", (cents, text) => {
+    expect(centsToReaisInput(cents)).toBe(text);
   });
 });

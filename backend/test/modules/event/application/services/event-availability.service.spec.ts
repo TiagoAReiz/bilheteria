@@ -19,6 +19,7 @@ describe('EventAvailabilityService', () => {
       getEventWithPhotos: vi.fn(),
       getEventIdsByOrganizer: vi.fn(),
       refreshAvailableTickets: vi.fn(),
+      updateWithTickets: vi.fn(),
     };
     const module = await Test.createTestingModule({
       providers: [

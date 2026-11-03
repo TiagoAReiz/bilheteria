@@ -9,8 +9,14 @@ export const PRIVATE_PATHS = ["/profile", "/events/new", "/payment", "/my-ticket
 
 export const LOGIN_PATH = "/login";
 
+/** Rotas privadas com parâmetro (o detalhe /events/:id continua público). */
+const PRIVATE_PATTERNS = [/^\/events\/[^/]+\/edit\/?$/];
+
 export function isPrivatePath(pathname: string): boolean {
-  return PRIVATE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return (
+    PRIVATE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
+    PRIVATE_PATTERNS.some((pattern) => pattern.test(pathname))
+  );
 }
 
 export function hasSessionCookie(cookieNames: Iterable<string>): boolean {

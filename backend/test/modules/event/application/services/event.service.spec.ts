@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { MockPort } from '../../../../utils/mocks.js';
 import { EventService } from '../../../../../src/modules/event/application/services/event.service.js';
@@ -47,6 +47,7 @@ describe('EventService', () => {
       getEventWithPhotos: vi.fn(),
       getEventIdsByOrganizer: vi.fn(),
       refreshAvailableTickets: vi.fn(),
+      updateWithTickets: vi.fn(),
     };
     metrics = { eventCreated: vi.fn() };
     images = mockImageStorage();
@@ -167,5 +168,48 @@ describe('EventService', () => {
       { id: 9, url: `${PUBLIC_BASE}/events/3/photos/b.png`, position: 1 },
     ]);
     expect(detail).not.toHaveProperty('cover_key');
+  });
+
+  describe('updateEvent', () => {
+    const owner = { id: 'org-1', role: 'ORGANIZER' };
+
+    it('aplica as regras sobre o valor atual (travado) e devolve a view', async () => {
+      const current = makeEvent({ capacity: 10, max_tickets_per_cpf: 2 });
+      eventRepository.updateWithTickets.mockImplementation(async (_id, _changes, check) => {
+        expect(check(current)).toBeNull();
+        expect(check(makeEvent({ max_tickets_per_cpf: 5 }))).toBe('limit_decrease');
+        return { outcome: 'updated', event: makeEvent({ max_tickets_per_cpf: 4, cover_key: 'events/1/cover/a.png' }) };
+      });
+
+      const view = await service.updateEvent(1, owner, { max_tickets_per_cpf: 4 });
+
+      expect(eventRepository.updateWithTickets).toHaveBeenCalledWith(1, { max_tickets_per_cpf: 4 }, expect.any(Function));
+      expect(view.max_tickets_per_cpf).toBe(4);
+      expect(view.cover_url).toBe(`${PUBLIC_BASE}/events/1/cover/a.png`);
+      expect(view).not.toHaveProperty('cover_key');
+    });
+
+    it('forbidden vira 403', async () => {
+      eventRepository.updateWithTickets.mockResolvedValue({ outcome: 'rejected', reason: 'forbidden' });
+      await expect(service.updateEvent(1, owner, { name: 'x' })).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it.each([
+      ['event_started', /já começou/],
+      ['capacity_decrease', /capacidade não pode diminuir/],
+      ['limit_decrease', /por CPF não pode diminuir/],
+      ['limit_above_capacity', /maior que a capacidade/],
+    ] as const)('%s vira 409', async (reason, message) => {
+      eventRepository.updateWithTickets.mockResolvedValue({ outcome: 'rejected', reason });
+      const promise = service.updateEvent(1, owner, { name: 'x' });
+      await expect(promise).rejects.toBeInstanceOf(ConflictException);
+      await expect(promise).rejects.toThrow(message);
+    });
+
+    it('NotFound do repositório sobe sem alteração', async () => {
+      const error = new NotFoundException('O evento 9 não foi encontrado');
+      eventRepository.updateWithTickets.mockRejectedValue(error);
+      await expect(service.updateEvent(9, owner, {})).rejects.toBe(error);
+    });
   });
 });

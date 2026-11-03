@@ -10,6 +10,7 @@ import {
   type EventServicePort,
 } from '../../../../../../src/modules/event/application/ports/inbound/services/event.service.port.js';
 import type { CreateEventDto } from '../../../../../../src/modules/event/adapters/dto/create-event-dto.js';
+import type { UpdateEventDto } from '../../../../../../src/modules/event/adapters/dto/update-event-dto.js';
 import type { EventView } from '../../../../../../src/modules/event/core/entities/event-image.entity.js';
 import { Role } from '../../../../../../src/modules/users/core/entities/role.js';
 
@@ -47,6 +48,7 @@ describe('EventController', () => {
       getEventById: vi.fn(),
       getEventDetail: vi.fn(),
       getEventIdsByOrganizer: vi.fn(),
+      updateEvent: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -140,6 +142,42 @@ describe('EventController', () => {
       expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
         RequestMethod.GET,
       );
+    });
+  });
+
+  describe('update', () => {
+    it('repassa o editor da sessão e só os campos editáveis', async () => {
+      eventService.updateEvent.mockResolvedValue(event);
+      const adminSession = { user: { id: 'adm', role: 'ADMIN' } } as unknown as UserSession;
+      const body = {
+        name: 'Novo',
+        max_tickets_per_cpf: 4,
+        organizer_id: 'hacker',
+        available_tickets: 999,
+      } as unknown as UpdateEventDto;
+
+      await expect(controller.update(adminSession, 1, body)).resolves.toBe(event);
+      expect(eventService.updateEvent).toHaveBeenCalledWith(
+        1,
+        { id: 'adm', role: 'ADMIN' },
+        {
+          name: 'Novo',
+          description: undefined,
+          location: undefined,
+          starts_at: undefined,
+          capacity: undefined,
+          price_cents: undefined,
+          max_tickets_per_cpf: 4,
+        },
+      );
+    });
+
+    it('exige ORGANIZER ou ADMIN e é mapeado em PATCH /events/:id', () => {
+      const handler = handlerOf(EventController, 'update');
+      expect(reflector.get(ROLES_KEY, handler)).toEqual(['ORGANIZER', 'ADMIN']);
+      expect(reflector.get(PUBLIC_KEY, handler)).toBeUndefined();
+      expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(':id');
+      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.PATCH);
     });
   });
 });

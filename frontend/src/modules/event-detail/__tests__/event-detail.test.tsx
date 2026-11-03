@@ -134,4 +134,36 @@ describe("<EventDetail />", () => {
       expect(screen.getByText(/a galeria está cheia/i)).toBeInTheDocument();
     });
   });
+
+  describe("editar evento", () => {
+    beforeEach(() => {
+      svc.getTicketStatus.mockResolvedValue({ total: 10, available: 5, reserved: 5 });
+    });
+
+    it("o organizador dono vê o link para editar", async () => {
+      jest.mocked(useSession).mockReturnValue(sessionValue(makeUser({ id: "org-1", role: "ORGANIZER" })));
+      svc.getEvent.mockResolvedValue(makeEventDetail({ id: 5 }));
+      render(<EventDetail eventId={5} />);
+
+      expect(await screen.findByRole("link", { name: /editar evento/i })).toHaveAttribute("href", "/events/5/edit");
+    });
+
+    it("visitante e outro organizador não veem", async () => {
+      jest.mocked(useSession).mockReturnValue(sessionValue(makeUser({ id: "org-2", role: "ORGANIZER" })));
+      svc.getEvent.mockResolvedValue(makeEventDetail());
+      render(<EventDetail eventId={1} />);
+
+      await screen.findByText("Show de Rock");
+      expect(screen.queryByRole("link", { name: /editar evento/i })).not.toBeInTheDocument();
+    });
+
+    it("evento que já começou não oferece editar", async () => {
+      jest.mocked(useSession).mockReturnValue(sessionValue(makeUser({ id: "org-1", role: "ORGANIZER" })));
+      svc.getEvent.mockResolvedValue(makeEventDetail({ starts_at: "2000-01-01T00:00:00.000Z" }));
+      render(<EventDetail eventId={1} />);
+
+      await screen.findByText("Show de Rock");
+      expect(screen.queryByRole("link", { name: /editar evento/i })).not.toBeInTheDocument();
+    });
+  });
 });
