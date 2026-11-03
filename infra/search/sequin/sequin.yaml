@@ -1,0 +1,89 @@
+# Sequin como código (carregado no boot via CONFIG_FILE_PATH; faz upsert dos recursos).
+# Referência: https://sequinstream.com/docs/reference/sequin-yaml (v0.14.6)
+#
+# Fluxo: Postgres `db` (WAL lógico) --publication bilheteria_search--> slot bilheteria_search
+#        --> Sequin (transform) --> Elasticsearch (aliases events / tickets)
+
+account:
+  name: "bilheteria"
+
+# login do console em http://localhost:7376 (só dev)
+users:
+  - email: "admin@bilheteria.local"
+    password: "sequinpassword!"
+
+# token da Management API (ex.: disparar backfill); só dev
+api_tokens:
+  - name: "bilheteria-dev"
+    token: "${SEQUIN_API_TOKEN:-bilheteria-dev-token}"
+
+databases:
+  - name: "bilheteria"
+    hostname: "${SOURCE_DB_HOST:-db}"
+    port: 5432
+    database: "${SOURCE_DB_NAME:-postgres}"
+    # dev: superusuário. Em produção, um usuário dedicado com REPLICATION + SELECT em event/ticket.
+    username: "${SOURCE_DB_USER:-postgres}"
+    password: "${SOURCE_DB_PASSWORD:-postgres}"
+    pool_size: 3
+    # o slot é do consumidor: o Sequin cria no primeiro boot e ele persiste (retendo WAL) até
+    # alguém dropar, mesmo com o Sequin parado. Ver "Riscos" no README da raiz.
+    slot:
+      name: "bilheteria_search"
+      create_if_not_exists: true
+    # a publication é criada pela migration 20261102120200_search_cdc_publication (tem que existir
+    # antes do slot e depende das tabelas, que só existem depois das migrations)
+    publication:
+      name: "bilheteria_search"
+      create_if_not_exists: false
+    # em dev o compose sobe o Sequin junto com o Postgres
+    await_database:
+      timeout_ms: 120000
+      interval_ms: 3000
+
+functions:
+  - name: "event-document"
+    description: "Linha de public.event -> documento do índice events"
+    type: "transform"
+    file: "transforms/event-document.exs"
+
+  - name: "ticket-document"
+    description: "Linha de public.ticket -> documento operacional do índice tickets (sem dados pessoais)"
+    type: "transform"
+    file: "transforms/ticket-document.exs"
+
+sinks:
+  # insert/update/read (backfill) viram bulk `index` (documento inteiro, _id = id da linha);
+  # delete vira bulk `delete`. Soft delete (deleted_at) é UPDATE: chega como `deleted: true`.
+  - name: "events-to-elasticsearch"
+    database: "bilheteria"
+    source:
+      include_tables:
+        - "public.event"
+    transform: "event-document"
+    # só na criação do sink: carrega as linhas que já existiam antes do CDC começar
+    initial_backfill: true
+    destination:
+      type: "elasticsearch"
+      endpoint_url: "${SEARCH_ELASTICSEARCH_URL:-http://elasticsearch:9200}"
+      index_name: "events"
+      # obrigatório no sink; ignorado enquanto o Elasticsearch de dev roda sem security
+      auth_type: "basic"
+      auth_value: "${SEARCH_ELASTICSEARCH_AUTH:-elastic:dev}"
+      batch_size: 100
+
+  - name: "tickets-to-elasticsearch"
+    database: "bilheteria"
+    source:
+      include_tables:
+        - "public.ticket"
+    transform: "ticket-document"
+    initial_backfill: true
+    destination:
+      type: "elasticsearch"
+      endpoint_url: "${SEARCH_ELASTICSEARCH_URL:-http://elasticsearch:9200}"
+      index_name: "tickets"
+      auth_type: "basic"
+      auth_value: "${SEARCH_ELASTICSEARCH_AUTH:-elastic:dev}"
+      # um evento cria `capacity` tickets de uma vez: lotes maiores
+      batch_size: 500

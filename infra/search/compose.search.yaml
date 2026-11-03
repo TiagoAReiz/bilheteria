@@ -1,0 +1,139 @@
+# Busca: Elasticsearch alimentado por CDC (Sequin lendo o WAL lógico do Postgres `db`).
+# Incluído pelo docker-compose.yaml da raiz (diretiva `include`). Detalhes no README da raiz,
+# seção "Busca (Elasticsearch + Sequin)".
+#
+# Ordem de subida: elasticsearch (healthy) -> search-init (templates/índices) -> sequin.
+# O Sequin depende de a publication `bilheteria_search` existir no `db`, e quem cria é a
+# migration do Prisma; até lá ele reinicia sozinho (restart: unless-stopped).
+
+services:
+
+  elasticsearch:
+    image: elasticsearch:8.19.23
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      cluster.name: bilheteria
+      # SÓ EM DEV: sem TLS e sem autenticação. Em produção, ligar a security e usar API key.
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      # notebook de dev com disco quase cheio não deve deixar os índices read-only
+      cluster.routing.allocation.disk.threshold_enabled: "false"
+    mem_limit: 1g
+    ports:
+      - 9200:9200
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  # aplica os templates versionados e cria os índices iniciais (events_v1/tickets_v1 atrás dos
+  # aliases events/tickets) ANTES de o Sequin escrever. Idempotente: roda a cada `up`.
+  search-init:
+    image: curlimages/curl:8.22.0
+    command: ["sh", "/search-init/init.sh"]
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    volumes:
+      - ./elasticsearch:/search-init:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+
+  sequin:
+    image: sequin/sequin:v0.14.6
+    restart: unless-stopped
+    ports:
+      - 7376:7376     # console web e Management API
+    expose:
+      - "8376"        # /metrics (Prometheus) só dentro da rede do compose
+    environment:
+      # Postgres e Redis PRÓPRIOS do Sequin (estado interno, não é o banco da aplicação)
+      PG_HOSTNAME: sequin-postgres
+      PG_PORT: "5432"
+      PG_DATABASE: sequin
+      PG_USERNAME: sequin
+      PG_PASSWORD: sequin
+      REDIS_URL: redis://sequin-redis:6379
+      # chaves de DEV; em produção gere com `openssl rand -base64 64` e `openssl rand -base64 32`
+      SECRET_KEY_BASE: ${SEQUIN_SECRET_KEY_BASE:-ceW+Nm+O2BiBb2QFgwA/KJx5ByJr4QCsUgIqDTBUGhcMeHOYABMwnkCK/6PXO0NN}
+      VAULT_KEY: ${SEQUIN_VAULT_KEY:-vUoCDXjMiwX0h4VydSJlyLYknRb/teNSASYkECVPovE=}
+      # perfil "minimal" da doc de requisitos mínimos do Sequin
+      PG_POOL_SIZE: "5"
+      REDIS_POOL_SIZE: "3"
+      DEFAULT_WORKERS_PER_SINK: "10"
+      MAX_MEMORY_MB: "1024"
+      # configuração como código: banco de origem, transforms e sinks
+      CONFIG_FILE_PATH: /config/sequin.yaml
+      # variáveis interpoladas dentro do sequin.yaml
+      SOURCE_DB_HOST: ${SOURCE_DB_HOST:-db}
+      SOURCE_DB_NAME: ${SOURCE_DB_NAME:-postgres}
+      SOURCE_DB_USER: ${SOURCE_DB_USER:-postgres}
+      SOURCE_DB_PASSWORD: ${SOURCE_DB_PASSWORD:-postgres}
+      SEARCH_ELASTICSEARCH_URL: http://elasticsearch:9200
+      SEQUIN_API_TOKEN: ${SEQUIN_API_TOKEN:-bilheteria-dev-token}
+    volumes:
+      - ./sequin:/config:ro
+    depends_on:
+      sequin-postgres:
+        condition: service_healthy
+      sequin-redis:
+        condition: service_healthy
+      search-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7376/health > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  sequin-postgres:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sequin
+      POSTGRES_USER: sequin
+      POSTGRES_PASSWORD: sequin
+    volumes:
+      - sequin_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sequin -d sequin"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  sequin-redis:
+    image: redis:7.4.12-alpine
+    restart: unless-stopped
+    # o Sequin exige Redis persistente entre reinícios
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - sequin_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # opcional, para explorar os índices: docker compose --profile debug up -d kibana
+  kibana:
+    image: kibana:8.19.23
+    profiles: [debug]
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    ports:
+      - 5601:5601
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+volumes:
+  elasticsearch_data:
+  sequin_postgres_data:
+  sequin_redis_data:

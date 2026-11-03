@@ -25,6 +25,7 @@ model ticket{
     deleted_at DateTime?
 
     @@index([user_id, event_id])
+    @@index([event_id])
 }
 
 model event{
@@ -34,6 +35,9 @@ model event{
     location String
     starts_at DateTime
     capacity Int
+    // contador aproximado para a busca: recalculado em lote pelo job de disponibilidade
+    // (o numero exato continua vindo do /status/:id, que conta os tickets)
+    available_tickets Int @default(0)
     organizer_id String
     organizer user @relation(fields: [organizer_id], references: [id])
     tickets ticket[]

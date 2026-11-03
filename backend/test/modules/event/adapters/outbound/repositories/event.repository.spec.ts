@@ -13,12 +13,14 @@ describe('EventRepository', () => {
       findMany: Mock;
       findFirst: Mock;
     };
+    $executeRaw: Mock;
   };
   let repository: EventRepository;
 
   beforeEach(() => {
     prisma = {
       event: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
+      $executeRaw: vi.fn(),
     };
     repository = new EventRepository(prisma as unknown as PrismaService);
   });
@@ -48,6 +50,7 @@ describe('EventRepository', () => {
           location: 'Arena',
           starts_at: newEvent.starts_at,
           capacity: 3,
+          available_tickets: 3,
           organizer_id: 'org-1',
           tickets: {
             createMany: {
@@ -89,6 +92,7 @@ describe('EventRepository', () => {
       const data = prisma.event.create.mock.calls[0][0].data;
       expect(Object.keys(data).sort()).toEqual(
         [
+          'available_tickets',
           'capacity',
           'description',
           'location',
@@ -140,6 +144,70 @@ describe('EventRepository', () => {
       const promise = repository.getEventById(5);
       await expect(promise).rejects.toBeInstanceOf(NotFoundException);
       await expect(promise).rejects.toThrow('O evento 5 não foi encontrado');
+    });
+  });
+
+  describe('getEventIdsByOrganizer', () => {
+    it('busca só os ids dos eventos do organizador, incluindo excluídos', async () => {
+      prisma.event.findMany.mockResolvedValue([{ id: 3 }, { id: 8 }]);
+
+      await expect(repository.getEventIdsByOrganizer('org-1')).resolves.toEqual(
+        [3, 8],
+      );
+      expect(prisma.event.findMany).toHaveBeenCalledWith({
+        where: { organizer_id: 'org-1' },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      });
+    });
+  });
+
+  describe('refreshAvailableTickets', () => {
+    const sqlOf = () => {
+      const [strings] = prisma.$executeRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ];
+      return strings.join('?').replace(/\s+/g, ' ');
+    };
+
+    it('faz um único UPDATE em lote e retorna quantos eventos mudaram', async () => {
+      prisma.$executeRaw.mockResolvedValue(2);
+
+      await expect(repository.refreshAvailableTickets(5)).resolves.toBe(2);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(sqlOf()).toContain(
+        'UPDATE event AS e SET available_tickets = c.available',
+      );
+    });
+
+    it('só grava eventos cujo contador mudou (não gera CDC à toa)', async () => {
+      prisma.$executeRaw.mockResolvedValue(0);
+      await repository.refreshAvailableTickets(5);
+
+      expect(sqlOf()).toContain('e.available_tickets <> c.available');
+    });
+
+    it('usa o mesmo critério de disponibilidade da reserva, com o TTL parametrizado', async () => {
+      prisma.$executeRaw.mockResolvedValue(0);
+      await repository.refreshAvailableTickets(7);
+
+      const sql = sqlOf();
+      expect(sql).toContain('t.is_paid = false');
+      expect(sql).toContain(
+        't.reserved_at IS NULL OR t.reserved_at < NOW() - make_interval(mins => ?)',
+      );
+      // o TTL vai como parametro, nunca interpolado no SQL
+      expect(prisma.$executeRaw.mock.calls[0].slice(1)).toEqual([7]);
+    });
+
+    it('ignora eventos passados e excluídos', async () => {
+      prisma.$executeRaw.mockResolvedValue(0);
+      await repository.refreshAvailableTickets(5);
+
+      expect(sqlOf()).toContain(
+        'WHERE ev.deleted_at IS NULL AND ev.starts_at > NOW()',
+      );
     });
   });
 });

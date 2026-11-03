@@ -44,6 +44,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   location: 'Arena',
   starts_at: new Date(NOW.getTime() + 24 * 60 * 60 * 1000),
   capacity: 100,
+  available_tickets: 100,
   organizer_id: 'org-1',
   created_at: NOW,
   updated_at: NOW,
@@ -87,6 +88,7 @@ describe('TicketService', () => {
       createEvent: vi.fn(),
       listUpcomingEvents: vi.fn(),
       getEventById: vi.fn().mockResolvedValue(makeEvent()),
+      getEventIdsByOrganizer: vi.fn(),
     };
 
     metrics = {

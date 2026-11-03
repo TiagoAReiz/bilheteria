@@ -1,5 +1,6 @@
 import { AxiosError, AxiosHeaders, type AxiosResponse } from "axios";
 import type { EventResponse } from "@/shared/types/event";
+import type { EventSearchItem, SearchEventsResponse } from "@/modules/events/types/event-search.dto";
 import type { User } from "@/shared/types/user";
 
 /** Cria um erro do axios no formato que o NestJS devolve. */
@@ -29,6 +30,24 @@ export function makeEvent(overrides: Partial<EventResponse> = {}): EventResponse
     deleted_at: null,
     ...overrides,
   };
+}
+
+export function makeSearchItem(overrides: Partial<EventSearchItem> = {}): EventSearchItem {
+  return {
+    id: 1,
+    name: "Show de Rock",
+    description: "Uma noite de rock",
+    location: "Arena Central",
+    starts_at: "2099-05-10T22:00:00.000Z",
+    capacity: 100,
+    available_tickets: 40,
+    ...overrides,
+  };
+}
+
+export function makeSearchResponse(overrides: Partial<SearchEventsResponse> = {}): SearchEventsResponse {
+  const items = overrides.items ?? [makeSearchItem()];
+  return { items, total: items.length, page: 1, size: 12, facets: { locations: [] }, ...overrides };
 }
 
 export function makeUser(overrides: Partial<User> = {}): User {

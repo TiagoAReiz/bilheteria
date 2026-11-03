@@ -1,8 +1,14 @@
+include:
+  - infra/search/compose.search.yaml   # Elasticsearch + Sequin (busca por CDC)
+
 services:
 
   db:
     image: postgres
     restart: always
+    # wal_level=logical: o Sequin lê as mudanças de event/ticket pelo WAL (CDC).
+    # max_slot_wal_keep_size: teto de WAL que o slot pode reter se o Sequin ficar parado.
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_slot_wal_keep_size=2GB"]
     ports:
       - 5432:5432
     environment:

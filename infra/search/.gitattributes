@@ -1,0 +1,2 @@
+# scripts rodam dentro de containers Linux: CRLF quebraria o `sh` em checkouts no Windows
+*.sh text eol=lf

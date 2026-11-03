@@ -7,4 +7,5 @@ export interface EventServicePort {
     createEvent(event: NewEvent): Promise<Event>;
     listUpcomingEvents(): Promise<Event[]>;
     getEventById(id: number): Promise<Event>;
+    getEventIdsByOrganizer(organizerId: string): Promise<number[]>;
 }
