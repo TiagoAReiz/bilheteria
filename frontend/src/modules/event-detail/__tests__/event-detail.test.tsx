@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { makeEvent, nestError, sessionValue } from "@test/helpers";
+import { makeEventDetail, makeUser, nestError, sessionValue } from "@test/helpers";
 import { useSession } from "@/shared/hooks/useSession";
 import { EventDetail } from "../components/event-detail";
 import { eventDetailService } from "../services/event-detail.service";
@@ -20,7 +20,7 @@ describe("<EventDetail />", () => {
   });
 
   it("mostra o evento e o status dos ingressos", async () => {
-    svc.getEvent.mockResolvedValue(makeEvent({ id: 2, name: "Stand-up", location: "Teatro Municipal" }));
+    svc.getEvent.mockResolvedValue(makeEventDetail({ id: 2, name: "Stand-up", location: "Teatro Municipal" }));
     svc.getTicketStatus.mockResolvedValue({ total: 100, available: 60, reserved: 40 });
     render(<EventDetail eventId={2} />);
 
@@ -33,7 +33,7 @@ describe("<EventDetail />", () => {
   });
 
   it("mostra o preço do ingresso em reais", async () => {
-    svc.getEvent.mockResolvedValue(makeEvent({ price_cents: 8990 }));
+    svc.getEvent.mockResolvedValue(makeEventDetail({ price_cents: 8990 }));
     svc.getTicketStatus.mockResolvedValue({ total: 10, available: 5, reserved: 5 });
     render(<EventDetail eventId={1} />);
 
@@ -41,7 +41,7 @@ describe("<EventDetail />", () => {
   });
 
   it("evento sem preço (anterior ao pagamento): vendas indisponíveis e reserva desabilitada", async () => {
-    svc.getEvent.mockResolvedValue(makeEvent({ price_cents: null }));
+    svc.getEvent.mockResolvedValue(makeEventDetail({ price_cents: null }));
     svc.getTicketStatus.mockResolvedValue({ total: 10, available: 5, reserved: 5 });
     render(<EventDetail eventId={1} />);
 
@@ -51,7 +51,7 @@ describe("<EventDetail />", () => {
   });
 
   it("marca como esgotado e desabilita a reserva", async () => {
-    svc.getEvent.mockResolvedValue(makeEvent());
+    svc.getEvent.mockResolvedValue(makeEventDetail());
     svc.getTicketStatus.mockResolvedValue({ total: 10, available: 0, reserved: 10 });
     render(<EventDetail eventId={1} />);
 
@@ -66,5 +66,72 @@ describe("<EventDetail />", () => {
 
     expect(await screen.findByText("Evento não encontrado")).toBeInTheDocument();
     expect(screen.getByText("O evento 99 não foi encontrado")).toBeInTheDocument();
+  });
+
+  describe("imagens", () => {
+    const withImages = () =>
+      makeEventDetail({
+        organizer_id: "org-1",
+        cover_url: "http://cdn/capa.png",
+        photos: [
+          { id: 1, url: "http://cdn/p1.png", position: 0 },
+          { id: 2, url: "http://cdn/p2.png", position: 1 },
+        ],
+      });
+
+    beforeEach(() => {
+      svc.getTicketStatus.mockResolvedValue({ total: 10, available: 5, reserved: 5 });
+    });
+
+    it("mostra a capa no topo e a galeria em ordem para qualquer visitante", async () => {
+      svc.getEvent.mockResolvedValue(withImages());
+      render(<EventDetail eventId={1} />);
+
+      expect(await screen.findByRole("img", { name: /capa de/i })).toHaveAttribute("src", "http://cdn/capa.png");
+      const gallery = screen.getByRole("list", { name: "Galeria de fotos" });
+      expect(gallery.querySelectorAll("img")[0]).toHaveAttribute("src", "http://cdn/p1.png");
+      expect(gallery.querySelectorAll("img")[1]).toHaveAttribute("src", "http://cdn/p2.png");
+      // sem controles de edição
+      expect(screen.queryByRole("button", { name: /trocar capa/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /remover foto/i })).not.toBeInTheDocument();
+    });
+
+    it("outro organizador não vê os controles", async () => {
+      jest.mocked(useSession).mockReturnValue(sessionValue(makeUser({ id: "org-2", role: "ORGANIZER" })));
+      svc.getEvent.mockResolvedValue(withImages());
+      render(<EventDetail eventId={1} />);
+
+      await screen.findByText("Show de Rock");
+      expect(screen.queryByRole("button", { name: /trocar capa/i })).not.toBeInTheDocument();
+    });
+
+    it("o organizador dono vê capa, galeria (x/10) e controles de cada foto", async () => {
+      jest.mocked(useSession).mockReturnValue(sessionValue(makeUser({ id: "org-1", role: "ORGANIZER" })));
+      svc.getEvent.mockResolvedValue(withImages());
+      render(<EventDetail eventId={1} />);
+
+      expect(await screen.findByRole("button", { name: /trocar capa/i })).toBeEnabled();
+      expect(screen.getByRole("button", { name: /remover capa/i })).toBeEnabled();
+      expect(screen.getByRole("button", { name: /adicionar foto \(2\/10\)/i })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Mover foto 1 para a esquerda" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Mover foto 1 para a direita" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Remover foto 2" })).toBeEnabled();
+      expect(screen.getByLabelText("Escolher imagem da capa")).toHaveAttribute("accept", "image/jpeg,image/png,image/webp");
+    });
+
+    it("ADMIN vê os controles de qualquer evento; galeria cheia desabilita adicionar", async () => {
+      jest.mocked(useSession).mockReturnValue(sessionValue(makeUser({ id: "adm", role: "ADMIN" })));
+      svc.getEvent.mockResolvedValue(
+        makeEventDetail({
+          cover_url: null,
+          photos: Array.from({ length: 10 }, (_, i) => ({ id: i + 1, url: `http://cdn/p${i}.png`, position: i })),
+        }),
+      );
+      render(<EventDetail eventId={1} />);
+
+      expect(await screen.findByRole("button", { name: /adicionar capa/i })).toBeEnabled();
+      expect(screen.getByRole("button", { name: /adicionar foto \(10\/10\)/i })).toBeDisabled();
+      expect(screen.getByText(/a galeria está cheia/i)).toBeInTheDocument();
+    });
   });
 });

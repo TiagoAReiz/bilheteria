@@ -25,6 +25,8 @@ export interface EventSearchItem {
   capacity: number;
   /** Aproximado (atualizado em lote a cada ~10s); o número exato está na página do evento. */
   available_tickets: number;
+  /** URL pública da capa (null: sem capa). */
+  cover_url: string | null;
 }
 
 export interface LocationFacet {

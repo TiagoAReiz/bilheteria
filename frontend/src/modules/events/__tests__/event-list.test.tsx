@@ -46,4 +46,18 @@ describe("<EventList />", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByText("Show de Rock")).toBeInTheDocument();
   });
+
+  it("mostra a capa no card quando o evento tem uma", async () => {
+    listUpcoming.mockResolvedValue([
+      makeEvent({ id: 1, name: "Com capa", cover_url: "http://cdn/events/1/cover/a.png" }),
+      makeEvent({ id: 2, name: "Sem capa", cover_url: null }),
+    ]);
+    render(<EventList />);
+
+    expect(await screen.findByRole("img", { name: "Capa de Com capa" })).toHaveAttribute(
+      "src",
+      "http://cdn/events/1/cover/a.png",
+    );
+    expect(screen.queryByRole("img", { name: "Capa de Sem capa" })).not.toBeInTheDocument();
+  });
 });

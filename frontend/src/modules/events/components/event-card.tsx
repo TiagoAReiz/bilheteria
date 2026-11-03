@@ -8,6 +8,8 @@ import type { EventResponse } from "@/shared/types/event";
 
 /** O que o card precisa: serve tanto para GET /events quanto para os itens da busca. */
 export type EventCardData = Pick<EventResponse, "id" | "name" | "description" | "location" | "starts_at"> & {
+  /** Capa (GET /events e busca); sem ela o card fica só com o texto. */
+  cover_url?: string | null;
   /** Só a busca informa (contador aproximado); sem ele o card não mostra disponibilidade. */
   available_tickets?: number;
 };
@@ -15,6 +17,15 @@ export type EventCardData = Pick<EventResponse, "id" | "name" | "description" | 
 export function EventCard({ event }: { event: EventCardData }) {
   return (
     <Card className="flex h-full flex-col">
+      {event.cover_url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- imagem do bucket (S3/LocalStack), sem otimização do Next
+        <img
+          src={event.cover_url}
+          alt={`Capa de ${event.name}`}
+          loading="lazy"
+          className="aspect-video w-full object-cover"
+        />
+      ) : null}
       <CardHeader>
         <CardTitle className="text-lg">{event.name}</CardTitle>
         {event.description ? <CardDescription className="line-clamp-2">{event.description}</CardDescription> : null}

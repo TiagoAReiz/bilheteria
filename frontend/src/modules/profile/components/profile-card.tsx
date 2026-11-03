@@ -2,6 +2,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { UserAvatar } from "@/shared/components/user-avatar";
 import type { Role, User } from "@/shared/types/user";
+import { AvatarEditor } from "./avatar-editor";
 
 export const roleLabels: Record<Role, string> = {
   USER: "Usuário",
@@ -9,7 +10,7 @@ export const roleLabels: Record<Role, string> = {
   ADMIN: "Administrador",
 };
 
-export function ProfileCard({ user }: { user: User }) {
+export function ProfileCard({ user, onAvatarChanged }: { user: User; onAvatarChanged?: () => Promise<void> | void }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center gap-4">
@@ -17,6 +18,7 @@ export function ProfileCard({ user }: { user: User }) {
         <div className="min-w-0 space-y-1">
           <CardTitle className="truncate">{user.name}</CardTitle>
           <CardDescription className="truncate">{user.email}</CardDescription>
+          <AvatarEditor user={user} onChanged={onAvatarChanged} />
         </div>
       </CardHeader>
       <CardContent>

@@ -3,31 +3,46 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeftIcon, BanknoteIcon, CalendarIcon, MapPinIcon, UsersIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Separator } from "@/shared/components/ui/separator";
 import { Skeleton } from "@/shared/components/ui/skeleton";
+import { useSession } from "@/shared/hooks/useSession";
 import { formatDateTime, formatNumber } from "@/shared/lib/format";
 import { formatBRL } from "@/shared/lib/money";
+import type { User } from "@/shared/types/user";
 import { useEventDetail } from "../hooks/useEventDetail";
+import { useEventImages } from "../hooks/useEventImages";
+import type { EventDetailResponse, TicketStatusResponse } from "../types/event-detail.dto";
+import { EventGallery } from "./event-gallery";
+import { EventImagesToolbar } from "./event-images-toolbar";
 import { ReserveTicketButton } from "./reserve-ticket-button";
 import { TicketStatusCard } from "./ticket-status-card";
+
+/** Só o organizador que criou o evento (ou um ADMIN) mexe nas imagens; a API confere de novo. */
+export function canEditEventImages(user: Pick<User, "id" | "role"> | null, event: Pick<EventDetailResponse, "organizer_id">) {
+  return Boolean(user && (user.role === "ADMIN" || user.id === event.organizer_id));
+}
+
+async function toastFailure(operation: Promise<string | null>) {
+  const failure = await operation;
+  if (failure) toast.error(failure);
+}
+
+const backLink = (
+  <Button asChild variant="ghost" size="sm" className="-ml-2">
+    <Link href="/">
+      <ArrowLeftIcon aria-hidden /> Voltar para eventos
+    </Link>
+  </Button>
+);
 
 export function EventDetail({ eventId }: { eventId: number }) {
   const { event, loading, error, notFound, ticketStatus, ticketStatusLoading, ticketStatusError, reloadTicketStatus } =
     useEventDetail(eventId);
-  // momento em que a página foi aberta (usado para saber se o evento já começou)
-  const [openedAt] = useState(() => Date.now());
-
-  const back = (
-    <Button asChild variant="ghost" size="sm" className="-ml-2">
-      <Link href="/">
-        <ArrowLeftIcon aria-hidden /> Voltar para eventos
-      </Link>
-    </Button>
-  );
 
   if (loading) {
     return (
@@ -41,7 +56,7 @@ export function EventDetail({ eventId }: { eventId: number }) {
   if (error || !event) {
     return (
       <div className="space-y-4">
-        {back}
+        {backLink}
         <Alert variant="destructive">
           <AlertTitle>{notFound ? "Evento não encontrado" : "Não foi possível carregar o evento"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
@@ -50,6 +65,36 @@ export function EventDetail({ eventId }: { eventId: number }) {
     );
   }
 
+  return (
+    <EventDetailContent
+      event={event}
+      ticketStatus={ticketStatus}
+      ticketStatusLoading={ticketStatusLoading}
+      ticketStatusError={ticketStatusError}
+      reloadTicketStatus={reloadTicketStatus}
+    />
+  );
+}
+
+function EventDetailContent({
+  event,
+  ticketStatus,
+  ticketStatusLoading,
+  ticketStatusError,
+  reloadTicketStatus,
+}: {
+  event: EventDetailResponse;
+  ticketStatus: TicketStatusResponse | null;
+  ticketStatusLoading: boolean;
+  ticketStatusError: string | null;
+  reloadTicketStatus: () => Promise<void>;
+}) {
+  // momento em que a página foi aberta (usado para saber se o evento já começou)
+  const [openedAt] = useState(() => Date.now());
+  const { user } = useSession();
+  const images = useEventImages(event.id, { cover_url: event.cover_url, photos: event.photos ?? [] });
+  const canEdit = canEditEventImages(user, event);
+
   const started = new Date(event.starts_at).getTime() <= openedAt;
   const soldOut = ticketStatus?.available === 0;
   // evento criado antes do pagamento existir: sem preço, sem venda (o backend também recusa)
@@ -57,7 +102,15 @@ export function EventDetail({ eventId }: { eventId: number }) {
 
   return (
     <div className="space-y-6">
-      {back}
+      {backLink}
+      {images.coverUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- imagem do bucket (S3/LocalStack), sem otimização do Next
+        <img
+          src={images.coverUrl}
+          alt={`Capa de ${event.name}`}
+          className="aspect-[21/9] w-full rounded-xl border object-cover"
+        />
+      ) : null}
       <Card>
         <CardHeader className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -91,6 +144,19 @@ export function EventDetail({ eventId }: { eventId: number }) {
         </CardHeader>
         <CardContent className="space-y-6">
           {event.description ? <p className="whitespace-pre-line">{event.description}</p> : null}
+          {canEdit ? <EventImagesToolbar images={images} /> : null}
+          {images.photos.length > 0 ? (
+            <section className="space-y-3">
+              <h2 className="font-semibold">Fotos</h2>
+              <EventGallery
+                photos={images.photos}
+                eventName={event.name}
+                disabled={images.busy}
+                onMove={canEdit ? (id, direction) => void toastFailure(images.movePhoto(id, direction)) : undefined}
+                onRemove={canEdit ? (id) => void toastFailure(images.removePhoto(id)) : undefined}
+              />
+            </section>
+          ) : null}
           <Separator />
           <section className="space-y-3">
             <h2 className="font-semibold">Ingressos</h2>
