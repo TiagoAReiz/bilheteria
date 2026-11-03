@@ -12,6 +12,7 @@ const validBody = () => ({
   location: 'Arena',
   starts_at: '2026-07-01T20:00:00.000Z',
   capacity: 100,
+  price_cents: 5000,
 });
 
 async function errorsFor(body: Record<string, unknown>) {
@@ -50,7 +51,7 @@ describe('CreateEventDto', () => {
     ).resolves.toEqual({ description: ['isString'] });
   });
 
-  it.each(['name', 'location', 'starts_at', 'capacity'])(
+  it.each(['name', 'location', 'starts_at', 'capacity', 'price_cents'])(
     'campo obrigatório ausente: %s',
     async (field) => {
       const body: Record<string, unknown> = validBody();
@@ -117,6 +118,31 @@ describe('CreateEventDto', () => {
     it('rejeita capacity como string numérica', async () => {
       const errors = await errorsFor({ ...validBody(), capacity: '10' });
       expect(errors.capacity).toContain('isInt');
+    });
+  });
+
+  describe('price_cents', () => {
+    it.each([100, 5000, 10_000_000])('aceita %d centavos', async (price_cents) => {
+      await expect(
+        errorsFor({ ...validBody(), price_cents }),
+      ).resolves.toEqual({});
+    });
+
+    it.each([
+      [0, 'min'],
+      [-100, 'min'],
+      [99, 'min'],
+      [10_000_001, 'max'],
+      [50.5, 'isInt'],
+    ])('rejeita %d (%s)', async (price_cents, constraint) => {
+      const errors = await errorsFor({ ...validBody(), price_cents });
+      expect(errors.price_cents).toContain(constraint);
+    });
+
+    // dinheiro só como inteiro de centavos: string ou reais com vírgula não passam
+    it.each(['5000', '50,00', null])('rejeita %j', async (price_cents) => {
+      const errors = await errorsFor({ ...validBody(), price_cents });
+      expect(errors.price_cents).toContain('isInt');
     });
   });
 });

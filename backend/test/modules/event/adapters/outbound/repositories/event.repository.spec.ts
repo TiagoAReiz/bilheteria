@@ -32,6 +32,7 @@ describe('EventRepository', () => {
       location: 'Arena',
       starts_at: new Date('2030-01-01T20:00:00Z'),
       capacity: 3,
+      price_cents: 5000,
       organizer_id: 'org-1',
     } satisfies NewEvent;
 
@@ -50,6 +51,7 @@ describe('EventRepository', () => {
           location: 'Arena',
           starts_at: newEvent.starts_at,
           capacity: 3,
+          price_cents: 5000,
           available_tickets: 3,
           organizer_id: 'org-1',
           tickets: {
@@ -98,6 +100,7 @@ describe('EventRepository', () => {
           'location',
           'name',
           'organizer_id',
+          'price_cents',
           'starts_at',
           'tickets',
         ].sort(),

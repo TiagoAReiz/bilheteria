@@ -1,9 +1,10 @@
 import { Controller, Get, Post, Body, Param, ParseIntPipe, Inject } from '@nestjs/common';
 import {TICKET_SERVICE, type TicketServicePort} from "../../../application/ports/inbound/services/ticket.service.port.js";
 import { ReservationDto } from '../../dto/reservation-dto.js';
-import {WebhookDto} from "../../dto/webhook-payment-dto.js";
 import {AllowAnonymous, Session, type UserSession} from "@thallesp/nestjs-better-auth";
 
+// O antigo POST /webhook/ticket/payment (público e sem assinatura) foi removido: o pagamento
+// agora é confirmado pelo webhook assinado do Mercado Pago (POST /webhooks/mercadopago).
 @Controller()
 export class TicketController {
   constructor(@Inject(TICKET_SERVICE) private readonly ticketService: TicketServicePort) {}
@@ -17,12 +18,5 @@ export class TicketController {
   @Post("/reservation")
   reservation(@Session() session: UserSession, @Body() dto :ReservationDto) {
     return this.ticketService.reserveTicket(session.user.id,dto.event_id);
-  }
-
-  // chamado pelo gateway de pagamento, que nao tem sessao
-  @AllowAnonymous()
-  @Post("/webhook/ticket/payment")
-  webhookConfirmTicketPayment(@Body() dto:WebhookDto) {
-    return this.ticketService.confirmTicketPayment(dto.id, dto.user_id)
   }
 }

@@ -1,4 +1,4 @@
-import {Injectable, NotFoundException} from "@nestjs/common";
+import {Injectable} from "@nestjs/common";
 import {Ticket} from "../../../core/entities/ticket.entity.js";
 import {ReservationResult, RESERVATION_TTL_MINUTES} from "../../../core/entities/reservation.entity.js";
 import {PrismaService} from "../../../../prisma/prisma.service.js";
@@ -64,22 +64,5 @@ export class TicketRepository implements TicketRepositoryPort {
     }
     async getCountAllTicketsByEvent(id: number):Promise<number> {
         return await this.prisma.ticket.count({where: {event_id: id}})
-    }
-
-    async getTicketById(id: number):Promise<Ticket> {
-        let ticket =  await this.prisma.ticket.findFirst({where: {id}})
-        if (ticket) {
-            return ticket;
-        }
-        throw new NotFoundException(`O ticket ${id} não foi encontrado`);
-    }
-
-    async updateTicket(ticket: Ticket):Promise<Ticket> {
-        let ticketDb = await this.prisma.ticket.update({where: {id: ticket.id}, data: ticket})
-        if (ticketDb) {
-            return ticket;
-        }
-        throw new NotFoundException(`O ticket ${ticket.id} não foi encontrado`);
-
     }
 }

@@ -114,10 +114,11 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 - Evento criado por `ORGANIZER` ou `ADMIN` (`@Roles`); o organizador é o usuário da sessão.
 - Ao criar, os `capacity` ingressos do evento são gerados na mesma transação.
 - Listagem mostra só eventos futuros e não excluídos (`deleted_at`).
+- `price_cents`: preço único do ingresso em centavos de BRL, obrigatório, inteiro de 100 (R$ 1,00) a 10.000.000 (R$ 100.000,00). Eventos anteriores ao pagamento têm `null` (sem venda; ver [payment](#payment)).
 
 | Método | Rota | Auth | Descrição |
 | --- | --- | --- | --- |
-| POST | `/events` | `ORGANIZER`/`ADMIN` | `{ name, description?, location, starts_at, capacity }` |
+| POST | `/events` | `ORGANIZER`/`ADMIN` | `{ name, description?, location, starts_at, capacity, price_cents }` |
 | GET | `/events` | não | próximos eventos |
 | GET | `/events/:id` | não | detalhe do evento |
 
@@ -134,9 +135,104 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 | --- | --- | --- | --- |
 | GET | `/status/:id` | não | total / disponíveis / reservados do evento |
 | POST | `/reservation` | sim | `{ event_id }` reserva um ingresso |
-| POST | `/webhook/ticket/payment` | não | `{ id, user_id }` confirma pagamento (gateway) |
 
 Dependências entre módulos: `ticket` usa as portas inbound de `users` (`USER_SERVICE`) e `event` (`EVENT_SERVICE`).
+
+O pagamento (e a marcação de `is_paid`) é do módulo [payment](#payment); o antigo `POST /webhook/ticket/payment`, público e sem assinatura, foi removido.
+
+### payment
+
+Pagamento do ingresso com o **Checkout Pro do Mercado Pago, pela API de Orders** (a de Preferences está sendo descontinuada). O comprador paga na página do Mercado Pago (Pix ou cartão); nenhum dado de cartão passa pela nossa API. O preço é **único por evento** (`event.price_cents`, em centavos de BRL), definido pelo organizador no `POST /events`.
+
+```
+ front                   API (módulo payment)                                    Mercado Pago
+   │ POST /reservation ──► ticket.reserved_at = NOW()   (vale 5 min)                  │
+   │ POST /payments/checkout {ticket_id}                                              │
+   │ ──────────────────► openCheckout: FOR UPDATE no ticket; valida dono/reserva/preço│
+   │                     reaproveita o pendente da mesma reserva ou cria `pending`    │
+   │                     POST /v1/orders  external_reference = payment.id ──────────► │
+   │                       expiration_time = fim da reserva, X-Idempotency-Key        │
+   │ ◄── { payment_id, checkout_url, expires_at }                                     │
+   │ ────────────── navegador vai para checkout_url ─────────────────────────────────►│ paga (Pix/cartão)
+   │                     POST /webhooks/mercadopago?data.id=ORD…&type=order ◄──────── │ x-signature
+   │                     1. assinatura HMAC (401 se inválida)                         │
+   │                     2. GET /v1/orders/{id}  (nunca confia no corpo) ───────────► │
+   │                     3. FOR UPDATE ticket → payment; reserva ainda válida?        │
+   │                        sim: ticket.is_paid + payment.approved (1 transação)      │
+   │                        não: POST /v1/orders/{id}/refund ───────────────────────► │ estorno
+   │                     4. 200 (503 se o Mercado Pago falhar: ele reenvia)           │
+   │ ◄─── /payment/success|pending|failure?payment_id=… ──────────────────────────────│
+   │ GET /payments/:id (a cada 3 s enquanto pending) ──► status real (do webhook)     │
+```
+
+Peças no código (mesmo padrão hexagonal dos outros módulos):
+
+| Peça | Arquivo | Papel |
+| --- | --- | --- |
+| regras | `core/entities/payment-rules.ts` | funções puras: pode abrir checkout? reaproveita? confirma ou estorna? |
+| `PAYMENT_SERVICE` | `application/services/payment.service.ts` | casos de uso; não conhece o Mercado Pago |
+| `PAYMENT_GATEWAY` | `adapters/outbound/gateways/mercadopago.gateway.ts` | API de Orders com `fetch` nativo (criar, consultar, estornar) |
+| `PAYMENT_REPOSITORY` | `adapters/outbound/repositories/payment.repository.ts` | transações com `SELECT ... FOR UPDATE` |
+| `PAYMENT_METRICS` | `adapters/outbound/metrics/otel-payment-metrics.ts` | métricas de negócio (ver [Métricas de negócio](#métricas-de-negócio)) |
+| assinatura | `adapters/inbound/webhooks/mercadopago-signature{,.guard}.ts` | valida o `x-signature` antes de qualquer outra coisa |
+
+O módulo não importa `ticket` nem `event`: o repositório lê e atualiza `ticket`/`event` dentro da própria transação (é o único jeito de marcar o ticket pago e o pagamento aprovado atomicamente sem uma abstração de unit of work), usando a regra de TTL do `ticket/core`.
+
+| Método | Rota | Auth | Descrição |
+| --- | --- | --- | --- |
+| POST | `/payments/checkout` | sim | `{ ticket_id }` → `{ payment_id, checkout_url, expires_at }` |
+| GET | `/payments/:id` | sim (dono) | `{ id, ticket_id, status, amount_cents, currency, expires_at, checkout_url, created_at, updated_at }`; de outra pessoa = 404 |
+| POST | `/webhooks/mercadopago` | assinatura | notificação do Mercado Pago (evento "Order (Mercado Pago)") |
+
+**Checkout** (`POST /payments/checkout`)
+
+- O ticket precisa ser do usuário da sessão (senão 403), não pago (409), com a reserva valendo por pelo menos mais 30 s (409 "reserve de novo") e de um evento com preço, não excluído e que não começou (409). Tudo checado com o ticket travado (`FOR UPDATE`) e o relógio do Postgres, o mesmo da reserva.
+- **Idempotente**: se já existe checkout pendente da mesma reserva, devolve o mesmo `checkout_url` sem criar outra order. Duas abas ao mesmo tempo: a segunda recebe 409 "já está sendo criado" enquanto a primeira fala com o Mercado Pago. Checkouts de reservas anteriores viram `expired`.
+- A order leva `external_reference = payment.id` (uuid), `total_amount` = `price_cents` do **banco** (o cliente nunca manda valor), `expiration_time` = fim da reserva (ex.: `PT4M30S`), `X-Idempotency-Key = payment.id`, URLs de retorno `{FRONTEND_URL}/payment/{success,pending,failure}?payment_id=…` com `auto_return: all` e **boleto/lotérica bloqueados** (`not_allowed_types: [ticket, atm]`): compensam em dias e a reserva dura 5 minutos.
+- Mercado Pago fora do ar (rede, timeout, 5xx, 429): 503 e o pagamento vira `cancelled` (dá para tentar de novo). Recusa do Mercado Pago (credencial, dados): 502.
+
+**Webhook** (`POST /webhooks/mercadopago`)
+
+1. **Assinatura**: `x-signature: ts=…,v1=…`; manifesto `id:<data.id da query>;request-id:<x-request-id>;ts:<ts>;`; `v1 = hex(HMAC-SHA256(MP_WEBHOOK_SECRET, manifesto))`, comparado em tempo constante. `ts` fora de `MP_WEBHOOK_TOLERANCE_SECONDS` é recusado (replay). **Sem `MP_WEBHOOK_SECRET`, tudo é recusado** (fail closed). Falhou: 401 e `bilheteria_payments_webhooks_rejected_total{reason}`.
+2. O corpo é ignorado: o estado vem de `GET /v1/orders/{data.id}`. A order precisa ter `external_reference` = um pagamento nosso, do mesmo provedor e com a mesma order.
+3. **Aprovada** (`processed`): numa transação, trava o ticket e depois o pagamento (sempre nessa ordem, a mesma do checkout: sem deadlock) e confirma se valor e moeda batem, o ticket não foi pago, continua do mesmo dono, é a **mesma reserva** (`reserved_at + TTL == payment.expires_at`) e ela não venceu (`NOW()` do Postgres). Aí `ticket.is_paid = true` e `payment.status = approved` **na mesma transação**.
+4. **Aprovada mas sem como entregar** (reserva vencida, ticket de outra pessoa ou já pago, valor diferente): estorno total (`POST /v1/orders/{id}/refund`), `payment.status = refunded`, métricas `rejected{reason}` e `refunded{reason}` e log `warn`.
+5. **Recusada/cancelada/expirada** no Mercado Pago: `rejected`/`cancelled`/`expired`. Pendente: nada muda.
+6. **Repetida**: estados finais não mudam (updates condicionais e checagem de `approved`/`refunded` com a linha travada); responde 200.
+7. Mercado Pago indisponível ao consultar/estornar: **503**, e o Mercado Pago reenvia (15 min, 30 min, 6 h, 48 h...). O estorno usa chave de idempotência nova a cada tentativa: estorno total em dobro é impossível (o segundo recebe `order_already_refunded`, tratado como sucesso).
+
+A reserva continua expirando em 5 minutos sem pagamento (regra do módulo ticket, inalterada) e um ticket pago nunca volta a ficar disponível (a reserva só pega `is_paid = false`).
+
+**O que impede vender o mesmo ingresso duas vezes**: (1) a reserva escolhe ingressos com `FOR UPDATE SKIP LOCKED`; (2) a confirmação trava o ticket e só aprova a reserva paga, ainda válida, do mesmo dono; (3) o `UPDATE ticket … WHERE is_paid = false AND user_id = …` precisa afetar 1 linha, senão a transação aborta; (4) o índice único parcial `payment_one_approved_per_ticket` impede, no banco, dois pagamentos aprovados para o mesmo ticket.
+
+**Status**: `pending` → `approved` | `rejected` | `cancelled` | `expired` | `refunded`. `approved` e `refunded` são finais.
+
+**Eventos antigos**: a migration `20261103120000_payment` deixa `price_cents` nulo nos eventos que já existiam (não há preço certo para inventar; um padrão venderia por um valor que o organizador nunca definiu). Eles aparecem com "Preço a definir" e o checkout recusa (409) até ganharem preço (hoje, direto no banco).
+
+#### Variáveis do pagamento
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `MP_ACCESS_TOKEN` | — | access token da aplicação (em dev, o de **teste**). Vazio: a API sobe e os pagamentos respondem 502 |
+| `MP_WEBHOOK_SECRET` | — | assinatura secreta do webhook, gerada no painel ao cadastrar a URL. Vazio: webhook sempre 401 |
+| `MP_NOTIFICATION_URL` | — | só referência: a URL a cadastrar no painel (`https://<túnel>/webhooks/mercadopago`). A API de Orders do Checkout Pro não tem URL de notificação por pedido |
+| `MP_WEBHOOK_TOLERANCE_SECONDS` | `300` | tolerância do `ts` da assinatura |
+| `MP_HTTP_TIMEOUT_MS` | `5000` | timeout por chamada ao Mercado Pago (1 a 15000; valor inválido impede a API de subir) |
+| `MP_API_BASE_URL` | `https://api.mercadopago.com` | só para testes |
+| `MP_PUBLIC_KEY` | — | não usada (o Checkout Pro redireciona; não há SDK JS no front) |
+| `FRONTEND_URL` | — | base das URLs de retorno do checkout |
+
+#### Testando no ambiente de teste do Mercado Pago
+
+1. Use as **credenciais de teste** da aplicação ([Suas integrações](https://www.mercadopago.com.br/developers/panel/app)) em `MP_ACCESS_TOKEN`.
+2. Suba o túnel e cadastre o webhook (passo a passo no [README da raiz](../README.md#pagamento-mercado-pago)); copie a assinatura secreta para `MP_WEBHOOK_SECRET` e reinicie a API.
+3. Crie um evento com preço, reserve, clique em **Pagar** e, na página do Mercado Pago, entre com um **usuário comprador de teste** (painel > Contas de teste), de preferência numa janela anônima.
+4. Cartões de teste (Brasil): Mastercard `5031 4332 1540 6351`, Visa `4235 6477 2802 5682`, Amex `3753 651535 56885`; CVV `123` (Amex `1234`); validade `11/30`; CPF `12345678909`. O **nome do titular** escolhe o resultado: `APRO` aprovado, `OTHE` recusado, `CONT` pendente, `FUND` saldo insuficiente, `SECU` CVV inválido, `EXPI` vencimento. Referência: [cartões de teste](https://www.mercadopago.com.br/developers/en/docs/checkout-api-orders/integration-test/cards).
+5. O botão **Simular notificação** do painel manda um evento com `data.id` fictício: a API valida a assinatura, consulta a order, não encontra e responde 200 (ignorada). Serve para conferir túnel + segredo.
+6. Estorno: reserve, abra o checkout e pague depois que o contador zerar (se o Mercado Pago ainda deixar) ou reserve de novo o mesmo ingresso com outra conta antes de o webhook chegar. O pagamento vira `refunded` e conta em `bilheteria_payments_refunded_total`.
+
+A documentação do Mercado Pago avisa que pagamentos de teste podem não disparar notificações para a URL cadastrada; nesse caso a tela de retorno fica em "Aguardando a confirmação" e dá para validar o webhook pelo "Simular notificação".
+
 
 ## Busca (Elasticsearch)
 
@@ -228,6 +324,7 @@ Variáveis (ver `.env.example`):
 | `CPF_HASH_SECRET` | chave do HMAC do CPF; trocar invalida os hashes existentes |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth Google |
 | `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | OAuth Facebook |
+| `MP_*` | Mercado Pago, ver [Variáveis do pagamento](#variáveis-do-pagamento) |
 | `OTEL_*`, `LOG_LEVEL`, `NODE_ENV` | opcionais, ver [Observabilidade](#observabilidade) |
 
 Depois de alterar `prisma/schema.prisma`, rode `npx prisma generate --config prisma7.config.ts` (ou `migrate dev`, que já gera).
@@ -272,13 +369,13 @@ export const TICKET_METRICS = Symbol('TICKET_METRICS');
 
 export interface TicketMetricsPort {
     reservationAttempted(outcome: ReservationOutcome, durationMs: number): void;
-    paymentConfirmed(): void;
-    paymentRejected(reason: PaymentRejectionReason): void;
 }
 
 // ticket.module.ts
 {provide: TICKET_METRICS, useClass: OtelTicketMetrics},   // adapters/outbound/metrics/otel-ticket-metrics.ts
 ```
+
+As métricas de pagamento moraram na `TICKET_METRICS` até o módulo `payment` existir; agora ficam na `PAYMENT_METRICS` (quem confirma o pagamento é o módulo payment), com os **mesmos nomes** (`bilheteria_payments_confirmed_total`, `bilheteria_payments_rejected_total{reason}`), então dashboards e a conversão reserva → pagamento continuam funcionando.
 
 O adapter recebe o `Meter` por DI (`OTEL_METER`, exportado pelo `ObservabilityModule`), o que permite testá-lo com um `MeterProvider` em memória (`test/utils/otel.ts`). Para uma métrica nova: método na porta, implementação no adapter, chamada no service, teste do adapter e do service.
 
@@ -286,8 +383,12 @@ O adapter recebe o `Meter` por DI (`OTEL_METER`, exportado pelo `ObservabilityMo
 | --- | --- | --- | --- |
 | `bilheteria_reservations_total` | counter | `outcome` | tentativas de reserva por desfecho: `reserved`, `limit_reached`, `sold_out`, `no_cpf`, `event_started`, `event_not_found` |
 | `bilheteria_reservation_duration_seconds` | histograma | `outcome` | duração da tentativa de reserva (mesmos desfechos) |
-| `bilheteria_payments_confirmed_total` | counter | — | pagamentos confirmados |
-| `bilheteria_payments_rejected_total` | counter | `reason` | confirmações recusadas: `expired`, `wrong_owner` |
+| `bilheteria_payments_confirmed_total` | counter | — | pagamentos confirmados (ticket pago) |
+| `bilheteria_payments_rejected_total` | counter | `reason` | aprovados pelo Mercado Pago mas recusados por nós (viram estorno): `expired`, `wrong_owner`, `already_paid`, `amount_mismatch` |
+| `bilheteria_payments_refunded_total` | counter | `reason` | estornos concluídos (mesmos motivos) |
+| `bilheteria_payments_not_approved_total` | counter | `status` | encerrados sem cobrança no Mercado Pago: `rejected`, `cancelled`, `expired` |
+| `bilheteria_payments_checkouts_total` | counter | `outcome` | checkouts abertos: `created` (nova order) ou `reused` (idempotência) |
+| `bilheteria_payments_webhooks_rejected_total` | counter | `reason` | notificações recusadas antes de processar: `missing_secret`, `missing_signature`, `malformed_signature`, `invalid_signature`, `stale_signature` |
 | `bilheteria_events_created_total` | counter | — | eventos criados |
 
 No código os instrumentos têm nomes OTel (`bilheteria.reservations`, `bilheteria.reservation.duration` em segundos...); o Alloy converte para os nomes acima. **Nunca** use id de usuário, evento ou ticket como label: cada valor distinto cria uma série nova no Prometheus. Ids vão em atributos de span.
@@ -298,7 +399,7 @@ Também chegam, sem código nosso: `http_server_request_duration_seconds` (por `
 
 ### Traces
 
-Spans automáticos de HTTP, rotas do express, Better Auth, Prisma e `pg`. Span manual só onde agrega: `ticket.reserve`, com os atributos `event.id` e `outcome`, aberto pela porta `TRACING` (`modules/observability/application/ports/outbound/tracing/tracing.port.ts`) para o service continuar sem OpenTelemetry. Recusa de negócio (4xx) fica registrada como evento no span, mas não marca o span como erro.
+Spans automáticos de HTTP, rotas do express, Better Auth, Prisma e `pg`. Span manual só onde agrega: `ticket.reserve` (atributos `event.id` e `outcome`), `payment.checkout` (`ticket.id`, `payment.id`, `outcome`) e `payment.notification` (`provider.order_id`, `payment.id`, `provider.status`, `outcome`), aberto pela porta `TRACING` (`modules/observability/application/ports/outbound/tracing/tracing.port.ts`) para o service continuar sem OpenTelemetry. Recusa de negócio (4xx) fica registrada como evento no span, mas não marca o span como erro.
 
 ### Variáveis
 
@@ -341,14 +442,14 @@ npm run test:load    # teste de carga (API rodando)
    - Índice `events` com analisador pt-BR (sem acento, stemming), autocomplete e filtros (cidade, data, disponibilidade).
    - `available` atualizado em lote na tabela `event` (não sincronizar cada reserva); `GET /events/search`.
    - Postgres segue como fonte da verdade: reserva e limite por usuário continuam no Postgres.
-3. **Pagamento com Mercado Pago**
-   - Criar a cobrança na reserva, com o ticket/usuário nos metadados.
-   - Webhook aceito **somente** do Mercado Pago, com validação de assinatura (`x-signature` + segredo); consultar o pagamento na API do Mercado Pago antes de confirmar.
-   - Confirmação idempotente (notificação repetida de ticket já pago não pode falhar).
-   - Hoje o `POST /webhook/ticket/payment` é público e sem assinatura: qualquer um com `id` + `user_id` marca o ticket como pago. Precisa ser fechado nessa etapa.
+3. **Pagamento com Mercado Pago** — feito (ver [payment](#payment)):
+   - [x] Checkout Pro pela API de Orders, preço único por evento, `external_reference` = id do pagamento.
+   - [x] Webhook só do Mercado Pago (assinatura `x-signature`, fail closed), consultando a order na API antes de confirmar.
+   - [x] Confirmação idempotente e atômica (ticket pago + pagamento aprovado na mesma transação); estorno automático quando a reserva já não vale.
+   - [x] `POST /webhook/ticket/payment` (público, sem assinatura) removido.
+   - Depois: preço por setor/meia-entrada; endpoint para o organizador definir o preço de eventos antigos; reconciliação periódica (job que consulta orders `pending` antigas, para o caso de o webhook nunca chegar); painel e alerta de `webhooks_rejected`/`refunded` no Grafana.
 
 ### Pendências encontradas pelos testes
 - `GET /status/:id`: `reserved` inclui ingressos pagos (`total - available`).
-- `TicketRepository.updateTicket`: o 404 nunca acontece (Prisma lança P2025), devolve o objeto recebido e envia `id`/`event_id` no `data`.
 - Status usa `Date.now()` da aplicação e a reserva usa `NOW()` do Postgres.
-- DTOs: `event_id` aceita 0/negativo, `user_id` do webhook aceita string vazia, `capacity` em string é rejeitado.
+- DTOs: `event_id` aceita 0/negativo, `capacity` em string é rejeitado.

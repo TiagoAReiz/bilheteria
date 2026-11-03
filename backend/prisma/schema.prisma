@@ -1,6 +1,8 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // índices únicos parciais do payment (no máximo um aprovado / um pendente por ticket)
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -20,6 +22,7 @@ model ticket{
     is_paid Boolean @default(false)
     event_id Int
     event event @relation(fields: [event_id], references: [id])
+    payments payment[]
     created_at DateTime @default(now())
     updated_at DateTime?
     deleted_at DateTime?
@@ -35,6 +38,9 @@ model event{
     location String
     starts_at DateTime
     capacity Int
+    // preço único do ingresso, em centavos de BRL (CHECK > 0 na migration). Nulo só nos eventos
+    // criados antes do pagamento: ficam sem venda até ganharem um preço (o checkout recusa).
+    price_cents Int?
     // contador aproximado para a busca: recalculado em lote pelo job de disponibilidade
     // (o numero exato continua vindo do /status/:id, que conta os tickets)
     available_tickets Int @default(0)
@@ -61,6 +67,7 @@ model user {
     accounts      account[]
     tickets       ticket[]
     events        event[]
+    payments      payment[]
 
     @@map("users")
 }
@@ -110,4 +117,44 @@ model verification {
 
     @@index([identifier])
     @@map("verifications")
+}
+
+enum PaymentStatus {
+  pending
+  approved
+  rejected
+  cancelled
+  expired
+  refunded
+}
+
+// Uma tentativa de pagamento de um ticket num provedor (hoje só o Mercado Pago).
+// O id (uuid) vai como external_reference para o provedor.
+model payment {
+    id                  String        @id @default(uuid())
+    ticket_id           Int
+    ticket              ticket        @relation(fields: [ticket_id], references: [id])
+    user_id             String
+    user                user          @relation(fields: [user_id], references: [id])
+    amount_cents        Int
+    currency            String        @default("BRL")
+    status              PaymentStatus @default(pending)
+    provider            String
+    provider_order_id   String?
+    provider_payment_id String?
+    checkout_url        String?
+    // fim da reserva paga por este checkout (identifica a reserva: reserved_at + TTL)
+    expires_at          DateTime
+    created_at          DateTime      @default(now())
+    updated_at          DateTime      @updatedAt
+
+    // idempotência pelos ids do provedor: a mesma order/pagamento nunca vira duas linhas
+    @@unique([provider, provider_order_id])
+    @@unique([provider, provider_payment_id])
+    // no máximo UM pagamento aprovado por ticket: o mesmo ingresso nunca é vendido duas vezes
+    @@unique([ticket_id], map: "payment_one_approved_per_ticket", where: {status: "approved"})
+    // no máximo um checkout pendente por ticket: o checkout é reaproveitado, não duplicado
+    @@unique([ticket_id], map: "payment_one_pending_per_ticket", where: {status: "pending"})
+    @@index([ticket_id, status])
+    @@index([user_id])
 }

@@ -1,5 +1,4 @@
 import type { Mock } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
 import type { PrismaService } from '../../../../../../src/modules/prisma/prisma.service.js';
 import { TicketRepository } from '../../../../../../src/modules/ticket/adapters/outbound/repositories/ticket.repository.js';
 import { RESERVATION_TTL_MINUTES } from '../../../../../../src/modules/ticket/core/entities/reservation.entity.js';
@@ -27,8 +26,6 @@ describe('TicketRepository', () => {
     ticket: {
       findMany: Mock;
       count: Mock;
-      findFirst: Mock;
-      update: Mock;
     };
   };
   let repository: TicketRepository;
@@ -42,8 +39,6 @@ describe('TicketRepository', () => {
       ticket: {
         findMany: vi.fn(),
         count: vi.fn(),
-        findFirst: vi.fn(),
-        update: vi.fn(),
       },
     };
     repository = new TicketRepository(prisma as unknown as PrismaService);
@@ -214,49 +209,6 @@ describe('TicketRepository', () => {
       expect(prisma.ticket.count).toHaveBeenCalledWith({
         where: { event_id: 10 },
       });
-    });
-  });
-
-  describe('getTicketById', () => {
-    it('retorna o ticket', async () => {
-      prisma.ticket.findFirst.mockResolvedValue(ticket);
-
-      await expect(repository.getTicketById(42)).resolves.toBe(ticket);
-      expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
-        where: { id: 42 },
-      });
-    });
-
-    it('lança NotFound quando não existe', async () => {
-      prisma.ticket.findFirst.mockResolvedValue(null);
-
-      await expect(repository.getTicketById(42)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
-
-  describe('updateTicket', () => {
-    it('atualiza pelo id e retorna o ticket recebido', async () => {
-      const paid: Ticket = Object.assign({}, ticket, { is_paid: true });
-      prisma.ticket.update.mockResolvedValue(paid);
-
-      await expect(repository.updateTicket(paid)).resolves.toBe(paid);
-      // comportamento atual: o objeto inteiro (inclusive id e event_id) vai em data
-      expect(prisma.ticket.update).toHaveBeenCalledWith({
-        where: { id: 42 },
-        data: paid,
-      });
-    });
-
-    // comportamento atual: prisma.ticket.update nunca resolve null (lanca P2025),
-    // entao o NotFoundException do repositorio so dispara se o client retornar falsy
-    it('lança NotFound se o client resolver sem registro', async () => {
-      prisma.ticket.update.mockResolvedValue(null);
-
-      await expect(repository.updateTicket(ticket)).rejects.toThrow(
-        NotFoundException,
-      );
     });
   });
 });

@@ -33,7 +33,6 @@ describe('TicketController', () => {
   beforeEach(async () => {
     ticketService = {
       reserveTicket: vi.fn(),
-      confirmTicketPayment: vi.fn(),
       statusTicketsByEvent: vi.fn(),
     };
 
@@ -85,35 +84,17 @@ describe('TicketController', () => {
     });
   });
 
-  describe('webhookConfirmTicketPayment', () => {
-    it('repassa id e user_id do body para confirmTicketPayment', async () => {
-      const paid: Ticket = Object.assign({}, ticket, { is_paid: true });
-      ticketService.confirmTicketPayment.mockResolvedValue(paid);
-
-      await expect(
-        controller.webhookConfirmTicketPayment({ id: 1, user_id: 'user-1' }),
-      ).resolves.toBe(paid);
-      expect(ticketService.confirmTicketPayment).toHaveBeenCalledWith(
-        1,
-        'user-1',
+  // o webhook antigo (público, sem assinatura) não pode voltar por engano
+  it('não expõe mais a confirmação manual de pagamento', () => {
+    const routes = Object.getOwnPropertyNames(TicketController.prototype)
+      .filter((name) => name !== 'constructor')
+      .map((name) =>
+        Reflect.getMetadata(
+          PATH_METADATA,
+          handlerOf(TicketController, name as keyof TicketController),
+        ) as unknown,
       );
-    });
-
-    // comportamento atual: o webhook e publico e nao valida assinatura/segredo do gateway,
-    // entao qualquer cliente que saiba (ticket id, user_id) consegue marcar o ingresso como pago
-    it('é pública e mapeada em POST /webhook/ticket/payment', () => {
-      const handler = handlerOf(
-        TicketController,
-        'webhookConfirmTicketPayment',
-      );
-      expect(reflector.get(PUBLIC_KEY, handler)).toBe(true);
-      expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(
-        '/webhook/ticket/payment',
-      );
-      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
-        RequestMethod.POST,
-      );
-    });
+    expect(routes).toEqual(['/status/:id', '/reservation']);
   });
 
   it('a classe não é pública como um todo', () => {

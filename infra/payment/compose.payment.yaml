@@ -1,0 +1,35 @@
+# Pagamento: túnel público para o webhook do Mercado Pago chegar na API local.
+# Incluído pelo docker-compose.yaml da raiz (diretiva `include`). Detalhes no README da raiz,
+# seção "Pagamento (Mercado Pago)".
+#
+# O Mercado Pago só entrega notificações numa URL pública HTTPS; localhost não serve. Um
+# "quick tunnel" do Cloudflare (sem conta, sem login) cria uma URL aleatória
+# https://<palavras>.trycloudflare.com que encaminha para a API em http://localhost:3000.
+#
+# Só sobe com o profile: docker compose --profile tunnel up -d cloudflared
+#
+# ATENÇÃO (só dev): o túnel expõe a API INTEIRA na internet enquanto estiver no ar, não só o
+# webhook. As rotas continuam exigindo sessão e o webhook exige assinatura, mas derrube o
+# túnel quando terminar (docker compose --profile tunnel stop cloudflared). A URL muda a
+# cada subida: atualize o cadastro no painel do Mercado Pago.
+
+services:
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.1
+    profiles: [tunnel]
+    restart: unless-stopped
+    command:
+      - tunnel
+      - --no-autoupdate
+      # servidor de métricas: GET /quicktunnel devolve {"hostname": "<...>.trycloudflare.com"}
+      - --metrics
+      - 0.0.0.0:2000
+      - --url
+      - http://host.docker.internal:3000
+    # host.docker.internal já existe no Docker Desktop (Windows/macOS); no Linux precisa disto
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      # só na máquina local: é por aqui que se descobre a URL pública gerada
+      - 127.0.0.1:20241:2000

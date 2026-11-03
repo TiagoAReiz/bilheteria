@@ -1,12 +1,7 @@
 import {ConflictException, ForbiddenException, Inject, Injectable, NotFoundException} from '@nestjs/common';
 import {Status} from "../../core/entities/status.entity.js";
 import {Ticket} from "../../core/entities/ticket.entity.js";
-import {
-  MAX_TICKETS_PER_USER_PER_EVENT,
-  RESERVATION_TTL_MINUTES,
-  ReservationResult,
-} from "../../core/entities/reservation.entity.js";
-import {PaymentRejectionReason} from "../../core/entities/payment.entity.js";
+import {MAX_TICKETS_PER_USER_PER_EVENT, ReservationResult} from "../../core/entities/reservation.entity.js";
 import {TicketServicePort} from "../ports/inbound/services/ticket.service.port.js";
 import {TICKET_REPOSITORY, type TicketRepositoryPort} from "../ports/outbound/repositories/ticket.repository.port.js";
 import {TICKET_METRICS, type TicketMetricsPort} from "../ports/outbound/metrics/ticket-metrics.port.js";
@@ -81,28 +76,6 @@ export class TicketService implements TicketServicePort {
     }
   }
 
-  async confirmTicketPayment (id: number, user_id:string):Promise<Ticket> {
-    const ticket = await this.ticketRepository.getTicketById(id);
-    const rejection = this.paymentRejectionReason(ticket, user_id);
-    if (rejection) {
-      this.metrics.paymentRejected(rejection);
-      throw PAYMENT_REJECTIONS[rejection]();
-    }
-    ticket.is_paid = true;
-    const paid = await this.ticketRepository.updateTicket(ticket);
-    this.metrics.paymentConfirmed();
-    return paid;
-  }
-
-  private paymentRejectionReason(ticket: Ticket, user_id: string): PaymentRejectionReason | undefined {
-    if (ticket.user_id !== user_id) {
-      return 'wrong_owner';
-    }
-    const withinTtl = ticket.reserved_at !== null
-        && Date.now() - ticket.reserved_at.getTime() <= RESERVATION_TTL_MINUTES * 60 * 1000;
-    return withinTtl ? undefined : 'expired';
-  }
-
   async statusTicketsByEvent(id: number):Promise<Status> {
     await this.eventService.getEventById(id);
     let total = (await this.ticketRepository.getCountAllTicketsByEvent(id));
@@ -112,7 +85,3 @@ export class TicketService implements TicketServicePort {
   }
 }
 
-const PAYMENT_REJECTIONS: Record<PaymentRejectionReason, () => ConflictException> = {
-  wrong_owner: () => new ConflictException('Pagamento não efetivado! O ticket não pertence ao usuário informado, por favor realize uma reserva em sua conta'),
-  expired: () => new ConflictException('Pagamento não efetivado! O ticket expirou, por favor realize uma nova reserva'),
-};

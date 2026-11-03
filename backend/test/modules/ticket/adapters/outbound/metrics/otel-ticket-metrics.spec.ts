@@ -8,7 +8,7 @@ import {
 } from '../../../../../utils/otel.js';
 
 // Nomes OTel; no Prometheus viram bilheteria_reservations_total,
-// bilheteria_reservation_duration_seconds, bilheteria_payments_{confirmed,rejected}_total.
+// bilheteria_reservation_duration_seconds (pagamentos: otel-payment-metrics.spec.ts).
 describe('OtelTicketMetrics', () => {
   let otel: InMemoryMetrics;
   let metrics: OtelTicketMetrics;
@@ -78,36 +78,6 @@ describe('OtelTicketMetrics', () => {
           expect(points[0].attributes).toEqual({ outcome });
         }
       },
-    );
-  });
-
-  it('paymentConfirmed incrementa bilheteria.payments.confirmed sem labels', async () => {
-    metrics.paymentConfirmed();
-    metrics.paymentConfirmed();
-
-    const counter = findMetric(
-      await otel.collect(),
-      'bilheteria.payments.confirmed',
-    );
-    expect(counter.descriptor.unit).toBe('{payment}');
-    expect(sumPoints(counter)).toEqual([{ attributes: {}, value: 2 }]);
-  });
-
-  it('paymentRejected incrementa bilheteria.payments.rejected por reason', async () => {
-    metrics.paymentRejected('expired');
-    metrics.paymentRejected('wrong_owner');
-    metrics.paymentRejected('expired');
-
-    const counter = findMetric(
-      await otel.collect(),
-      'bilheteria.payments.rejected',
-    );
-    expect(sumPoints(counter)).toHaveLength(2);
-    expect(sumPoints(counter)).toEqual(
-      expect.arrayContaining([
-        { attributes: { reason: 'expired' }, value: 2 },
-        { attributes: { reason: 'wrong_owner' }, value: 1 },
-      ]),
     );
   });
 });

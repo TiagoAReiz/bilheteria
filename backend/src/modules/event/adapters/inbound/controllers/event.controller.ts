@@ -17,6 +17,7 @@ export class EventController {
       location: dto.location,
       starts_at: dto.starts_at,
       capacity: dto.capacity,
+      price_cents: dto.price_cents,
       organizer_id: session.user.id,
     });
   }

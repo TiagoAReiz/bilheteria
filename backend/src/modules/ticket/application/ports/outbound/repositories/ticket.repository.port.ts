@@ -8,6 +8,4 @@ export interface TicketRepositoryPort {
     getTicketsByUserAndEvent(user_id: string, event_id: number): Promise<Ticket[]>;
     getCountAvailablesTicketsByEvent(id: number): Promise<number>;
     getCountAllTicketsByEvent(id: number): Promise<number>;
-    getTicketById(id: number): Promise<Ticket>;
-    updateTicket(ticket: Ticket): Promise<Ticket>;
 }

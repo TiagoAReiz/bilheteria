@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { PrismaService } from './../src/modules/prisma/prisma.service.js';
@@ -23,6 +24,21 @@ const TEST_ENV: Record<string, string> = {
   ELASTICSEARCH_REQUEST_TIMEOUT_MS: '500',
   // o job de disponibilidade nao roda no e2e (o fake do Prisma nao tem $executeRaw)
   AVAILABILITY_REFRESH_INTERVAL_MS: '0',
+  // Mercado Pago: segredo fixo para assinar as notificações do teste e a API numa porta
+  // fechada (nenhuma chamada sai para a internet; o provedor "fora do ar" vira 503)
+  MP_ACCESS_TOKEN: 'e2e-token',
+  MP_WEBHOOK_SECRET: 'e2e-webhook-secret',
+  MP_API_BASE_URL: 'http://127.0.0.1:1',
+  MP_HTTP_TIMEOUT_MS: '1000',
+};
+
+// assina como o Mercado Pago: HMAC-SHA256 de id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+const mercadoPagoHeaders = (dataId: string, requestId = 'e2e-request-1') => {
+  const ts = String(Math.floor(Date.now() / 1000));
+  const v1 = createHmac('sha256', TEST_ENV.MP_WEBHOOK_SECRET)
+    .update(`id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`)
+    .digest('hex');
+  return { 'x-signature': `ts=${ts},v1=${v1}`, 'x-request-id': requestId };
 };
 
 const upcoming = {
@@ -32,6 +48,7 @@ const upcoming = {
   location: 'Arena',
   starts_at: new Date('2099-01-01T20:00:00.000Z'),
   capacity: 10,
+  price_cents: 5000,
   available_tickets: 10,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00.000Z'),
@@ -137,24 +154,53 @@ describe('Bilheteria (e2e, sem banco)', () => {
       expect(res.body).toEqual({ total: 10, available: 7, reserved: 3 });
     });
 
-    it('POST /webhook/ticket/payment valida o body (400)', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/webhook/ticket/payment')
-        .send({ id: 'x' })
-        .expect(400);
-      expect(res.body.message).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining('id'),
-          expect.stringContaining('user_id'),
-        ]),
-      );
-    });
-
-    it('POST /webhook/ticket/payment retorna 404 para ticket inexistente', async () => {
+    it('o webhook antigo POST /webhook/ticket/payment não existe mais (404)', async () => {
       await request(app.getHttpServer())
         .post('/webhook/ticket/payment')
         .send({ id: 123, user_id: 'user-1' })
         .expect(404);
+      expect(prisma.ticket.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('webhook do Mercado Pago', () => {
+    const url = '/webhooks/mercadopago?data.id=ORDTST01&type=order';
+    const body = { action: 'order.processed', type: 'order', data: { id: 'ORDTST01' } };
+
+    it('sem assinatura: 401 sem tocar no banco', async () => {
+      await request(app.getHttpServer()).post(url).send(body).expect(401);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('assinatura com segredo errado: 401', async () => {
+      const headers = mercadoPagoHeaders('ORDTST01');
+      headers['x-signature'] = headers['x-signature'].replace(/v1=[0-9a-f]+/, `v1=${'0'.repeat(64)}`);
+      await request(app.getHttpServer()).post(url).set(headers).send(body).expect(401);
+    });
+
+    it('assinatura de outra order (data.id trocado na URL): 401', async () => {
+      await request(app.getHttpServer())
+        .post(url)
+        .set(mercadoPagoHeaders('ORDTST99'))
+        .send(body)
+        .expect(401);
+    });
+
+    it('assinada, mas o Mercado Pago está fora do ar: 503 (o provedor reenvia depois)', async () => {
+      await request(app.getHttpServer())
+        .post(url)
+        .set(mercadoPagoHeaders('ORDTST01'))
+        .send(body)
+        .expect(503);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('assinada, de outro tópico: 200 sem consultar nada', async () => {
+      await request(app.getHttpServer())
+        .post('/webhooks/mercadopago?data.id=123&type=payment')
+        .set(mercadoPagoHeaders('123'))
+        .send({})
+        .expect(200, { received: true });
     });
   });
 
@@ -207,6 +253,8 @@ describe('Bilheteria (e2e, sem banco)', () => {
       ['post', '/reservation'],
       ['post', '/events'],
       ['get', '/tickets/search'],
+      ['post', '/payments/checkout'],
+      ['get', '/payments/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f'],
     ] as const)('%s %s retorna 401', async (method, path) => {
       await request(app.getHttpServer())[method](path).send({}).expect(401);
     });

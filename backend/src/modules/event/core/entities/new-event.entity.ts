@@ -4,5 +4,6 @@ export class NewEvent {
     location: string;
     starts_at: Date;
     capacity: number;
+    price_cents: number;
     organizer_id: string;
 }

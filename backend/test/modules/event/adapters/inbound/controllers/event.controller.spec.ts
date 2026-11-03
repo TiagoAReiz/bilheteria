@@ -25,6 +25,7 @@ const event: Event = {
   location: 'Arena',
   starts_at: new Date('2030-01-01T20:00:00Z'),
   capacity: 10,
+  price_cents: 5000,
   available_tickets: 10,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00Z'),
@@ -67,6 +68,7 @@ describe('EventController', () => {
         location: 'Arena',
         starts_at,
         capacity: 10,
+        price_cents: 5000,
         // campos que o cliente nao pode definir
         organizer_id: 'hacker',
         id: 999,
@@ -81,6 +83,7 @@ describe('EventController', () => {
         location: 'Arena',
         starts_at,
         capacity: 10,
+        price_cents: 5000,
         organizer_id: 'org-1',
       });
     });

@@ -18,6 +18,7 @@ export class EventRepository implements EventRepositoryPort {
                 location: event.location,
                 starts_at: event.starts_at,
                 capacity: event.capacity,
+                price_cents: event.price_cents,
                 // todos os ingressos nascem livres; daqui em diante quem mantem e o job de disponibilidade
                 available_tickets: event.capacity,
                 organizer_id: event.organizer_id,

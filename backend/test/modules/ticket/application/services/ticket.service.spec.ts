@@ -27,15 +27,11 @@ import {
   type ActiveSpan,
   type TracingPort,
 } from '../../../../../src/modules/observability/application/ports/outbound/tracing/tracing.port.js';
-import {
-  MAX_TICKETS_PER_USER_PER_EVENT,
-  RESERVATION_TTL_MINUTES,
-} from '../../../../../src/modules/ticket/core/entities/reservation.entity.js';
+import { MAX_TICKETS_PER_USER_PER_EVENT } from '../../../../../src/modules/ticket/core/entities/reservation.entity.js';
 import type { Ticket } from '../../../../../src/modules/ticket/core/entities/ticket.entity.js';
 import type { Event } from '../../../../../src/modules/event/core/entities/event.entity.js';
 
 const NOW = new Date('2026-06-15T12:00:00.000Z');
-const TTL_MS = RESERVATION_TTL_MINUTES * 60 * 1000;
 
 const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   id: 10,
@@ -44,6 +40,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   location: 'Arena',
   starts_at: new Date(NOW.getTime() + 24 * 60 * 60 * 1000),
   capacity: 100,
+  price_cents: 5000,
   available_tickets: 100,
   organizer_id: 'org-1',
   created_at: NOW,
@@ -76,8 +73,6 @@ describe('TicketService', () => {
       getTicketsByUserAndEvent: vi.fn(),
       getCountAvailablesTicketsByEvent: vi.fn(),
       getCountAllTicketsByEvent: vi.fn(),
-      getTicketById: vi.fn(),
-      updateTicket: vi.fn(),
     };
     userService = {
       registerCpf: vi.fn(),
@@ -93,8 +88,6 @@ describe('TicketService', () => {
 
     metrics = {
       reservationAttempted: vi.fn(),
-      paymentConfirmed: vi.fn(),
-      paymentRejected: vi.fn(),
     };
     // tracing de verdade fica no OtelTracing; aqui só executa o trabalho com um span fake
     span = { setAttributes: vi.fn() };
@@ -323,183 +316,6 @@ describe('TicketService', () => {
         );
         expect(metrics.reservationAttempted).not.toHaveBeenCalled();
       });
-    });
-  });
-
-  describe('confirmTicketPayment', () => {
-    describe('métricas de pagamento', () => {
-      it('pagamento confirmado: paymentConfirmed depois de salvar', async () => {
-        ticketRepository.getTicketById.mockResolvedValue(makeTicket());
-        ticketRepository.updateTicket.mockImplementation(async (t) => t);
-
-        await service.confirmTicketPayment(1, 'user-1');
-
-        expect(metrics.paymentConfirmed).toHaveBeenCalledTimes(1);
-        expect(metrics.paymentRejected).not.toHaveBeenCalled();
-      });
-
-      it('ticket de outro usuário: paymentRejected(wrong_owner)', async () => {
-        ticketRepository.getTicketById.mockResolvedValue(
-          makeTicket({ user_id: 'other-user' }),
-        );
-
-        await expect(
-          service.confirmTicketPayment(1, 'user-1'),
-        ).rejects.toBeInstanceOf(ConflictException);
-
-        expect(metrics.paymentRejected).toHaveBeenCalledExactlyOnceWith(
-          'wrong_owner',
-        );
-        expect(metrics.paymentConfirmed).not.toHaveBeenCalled();
-      });
-
-      it.each([
-        ['expirada', { reserved_at: new Date(NOW.getTime() - TTL_MS - 1) }],
-        ['sem reserved_at', { reserved_at: null }],
-      ])(
-        'reserva %s: paymentRejected(expired)',
-        async (_caso, overrides: Partial<Ticket>) => {
-          ticketRepository.getTicketById.mockResolvedValue(
-            makeTicket(overrides),
-          );
-
-          await expect(
-            service.confirmTicketPayment(1, 'user-1'),
-          ).rejects.toThrow(/expirou/);
-
-          expect(metrics.paymentRejected).toHaveBeenCalledExactlyOnceWith(
-            'expired',
-          );
-        },
-      );
-
-      it('ticket inexistente e falha ao salvar não geram métrica', async () => {
-        ticketRepository.getTicketById.mockRejectedValueOnce(
-          new NotFoundException(),
-        );
-        await expect(
-          service.confirmTicketPayment(1, 'user-1'),
-        ).rejects.toBeInstanceOf(NotFoundException);
-
-        ticketRepository.getTicketById.mockResolvedValue(makeTicket());
-        ticketRepository.updateTicket.mockRejectedValue(new Error('db'));
-        await expect(service.confirmTicketPayment(1, 'user-1')).rejects.toThrow(
-          'db',
-        );
-
-        expect(metrics.paymentConfirmed).not.toHaveBeenCalled();
-        expect(metrics.paymentRejected).not.toHaveBeenCalled();
-      });
-    });
-
-    it('lança Conflict quando o ticket pertence a outro usuário', async () => {
-      ticketRepository.getTicketById.mockResolvedValue(
-        makeTicket({ user_id: 'other-user' }),
-      );
-
-      await expect(service.confirmTicketPayment(1, 'user-1')).rejects.toThrow(
-        /não pertence ao usuário/,
-      );
-      expect(ticketRepository.updateTicket).not.toHaveBeenCalled();
-    });
-
-    it('lança Conflict quando o ticket não tem dono (user_id null)', async () => {
-      ticketRepository.getTicketById.mockResolvedValue(
-        makeTicket({ user_id: null, reserved_at: null }),
-      );
-
-      await expect(service.confirmTicketPayment(1, 'user-1')).rejects.toThrow(
-        /não pertence ao usuário/,
-      );
-    });
-
-    it('lança Conflict quando a reserva expirou', async () => {
-      ticketRepository.getTicketById.mockResolvedValue(
-        makeTicket({ reserved_at: new Date(NOW.getTime() - TTL_MS - 1) }),
-      );
-
-      await expect(service.confirmTicketPayment(1, 'user-1')).rejects.toThrow(
-        /expirou/,
-      );
-      expect(ticketRepository.updateTicket).not.toHaveBeenCalled();
-    });
-
-    it('lança Conflict quando o ticket não tem reserved_at', async () => {
-      ticketRepository.getTicketById.mockResolvedValue(
-        makeTicket({ reserved_at: null }),
-      );
-
-      await expect(
-        service.confirmTicketPayment(1, 'user-1'),
-      ).rejects.toBeInstanceOf(ConflictException);
-      expect(ticketRepository.updateTicket).not.toHaveBeenCalled();
-    });
-
-    it('marca is_paid e chama updateTicket quando a reserva está válida', async () => {
-      const ticket = makeTicket({
-        reserved_at: new Date(NOW.getTime() - 60 * 1000),
-      });
-      ticketRepository.getTicketById.mockResolvedValue(ticket);
-      ticketRepository.updateTicket.mockImplementation(async (t) => t);
-
-      const result = await service.confirmTicketPayment(1, 'user-1');
-
-      expect(ticketRepository.getTicketById).toHaveBeenCalledWith(1);
-      expect(ticketRepository.updateTicket).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 1, is_paid: true }),
-      );
-      expect(result.is_paid).toBe(true);
-    });
-
-    it('aceita o pagamento exatamente no limite do TTL', async () => {
-      ticketRepository.getTicketById.mockResolvedValue(
-        makeTicket({ reserved_at: new Date(NOW.getTime() - TTL_MS) }),
-      );
-      ticketRepository.updateTicket.mockImplementation(async (t) => t);
-
-      await expect(
-        service.confirmTicketPayment(1, 'user-1'),
-      ).resolves.toMatchObject({ is_paid: true });
-    });
-
-    it('o tempo é medido no momento da confirmação (fake timers)', async () => {
-      ticketRepository.getTicketById.mockImplementation(async () =>
-        makeTicket({ reserved_at: new Date(NOW) }),
-      );
-      ticketRepository.updateTicket.mockImplementation(async (t) => t);
-
-      vi.setSystemTime(NOW.getTime() + TTL_MS - 1);
-      await expect(
-        service.confirmTicketPayment(1, 'user-1'),
-      ).resolves.toMatchObject({ is_paid: true });
-
-      vi.setSystemTime(NOW.getTime() + TTL_MS + 1);
-      await expect(service.confirmTicketPayment(1, 'user-1')).rejects.toThrow(
-        /expirou/,
-      );
-    });
-
-    // comportamento atual: um ticket ja pago cuja reserva tem mais de TTL minutos
-    // e recusado como "expirado". Um reenvio do webhook pelo gateway apos 5 min
-    // recebe 409 mesmo o ingresso estando pago (falta idempotencia).
-    it('documenta: ticket já pago com reserved_at antigo é recusado como expirado', async () => {
-      ticketRepository.getTicketById.mockResolvedValue(
-        makeTicket({
-          is_paid: true,
-          reserved_at: new Date(NOW.getTime() - TTL_MS - 60 * 1000),
-        }),
-      );
-
-      await expect(service.confirmTicketPayment(1, 'user-1')).rejects.toThrow(
-        /expirou/,
-      );
-    });
-
-    it('propaga o NotFound do repositório', async () => {
-      ticketRepository.getTicketById.mockRejectedValue(new NotFoundException());
-      await expect(
-        service.confirmTicketPayment(1, 'user-1'),
-      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

@@ -1,6 +1,6 @@
 # Bilheteria
 
-Venda de ingressos com reserva concorrente, login social (Google e Facebook) e limite de ingressos por CPF.
+Venda de ingressos com reserva concorrente, pagamento pelo Mercado Pago (Checkout Pro), login social (Google e Facebook) e limite de ingressos por CPF.
 
 | App | Stack | Porta | Docs |
 | --- | --- | --- | --- |
@@ -11,9 +11,9 @@ Venda de ingressos com reserva concorrente, login social (Google e Facebook) e l
 
 ```
 bilheteria/
-├── backend/              # API: módulos users, event, ticket em arquitetura hexagonal
+├── backend/              # API: módulos users, event, ticket, payment em arquitetura hexagonal
 ├── frontend/             # app web: rotas (public)/(private), modules/ por página, shared/
-├── infra/                # configs da stack de observabilidade (Alloy, Prometheus, Loki, Tempo, Grafana)
+├── infra/                # observabilidade (Alloy, Prometheus, Loki, Tempo, Grafana), busca e túnel do pagamento
 ├── docker-compose.yaml   # infraestrutura compartilhada: Postgres + observabilidade
 └── package.json          # atalhos para rodar os dois apps a partir da raiz
 ```
@@ -181,6 +181,44 @@ curl 'localhost:3000/events/suggest?q=fes'
 - **Mudança de schema**: coluna nova em `event`/`ticket` não aparece no índice até a transform e o template incluírem o campo (os mappings são `dynamic: strict`: um campo inesperado vira erro visível no console do Sequin, não lixo no índice). Renomear/remover coluna usada pela transform quebra o sink: altere a transform junto com a migration.
 - **Sequin v0.14.6**: é a versão mais recente publicada (fev/2026); não houve releases depois disso. Vale acompanhar o status do projeto antes de ir para produção.
 
+## Pagamento (Mercado Pago)
+
+O ingresso é pago no **Checkout Pro** do Mercado Pago (API de Orders): o front chama `POST /payments/checkout`, o navegador vai para a página do Mercado Pago (Pix ou cartão) e a confirmação chega pelo **webhook assinado** `POST /webhooks/mercadopago`, que consulta a order na API do Mercado Pago e marca o ingresso como pago. Regras, garantias e endpoints: [backend/README.md#payment](backend/README.md#payment).
+
+```
+navegador ──► front ──► API POST /payments/checkout ──► Mercado Pago (cria a order)
+   │                                                        │
+   └──────────── paga na página do Mercado Pago ◄───────────┘
+                                                            │ webhook (x-signature)
+Mercado Pago ──► https://<aleatório>.trycloudflare.com ──► cloudflared ──► API :3000 /webhooks/mercadopago
+```
+
+O Mercado Pago só entrega notificações numa URL pública HTTPS. Em dev, o serviço `cloudflared` ([`infra/payment/compose.payment.yaml`](infra/payment/compose.payment.yaml), profile `tunnel`) abre um *quick tunnel* do Cloudflare, sem conta, apontando para `http://host.docker.internal:3000`.
+
+### Testando um pagamento ponta a ponta
+
+1. **Credenciais**: em `backend/.env`, `MP_ACCESS_TOKEN` com o access token **de teste** da aplicação ([Suas integrações](https://www.mercadopago.com.br/developers/panel/app) > Credenciais de teste).
+2. **Suba tudo**: `npm run infra:up`, `npx prisma migrate deploy --config prisma7.config.ts` (em `backend/`), `npm run dev:backend` e `npm run dev:frontend`.
+3. **Suba o túnel e pegue a URL** (ela muda a cada subida):
+
+   ```bash
+   docker compose --profile tunnel up -d cloudflared
+   curl -s localhost:20241/quicktunnel          # {"hostname":"<palavras>.trycloudflare.com"}
+   # ou: docker compose logs cloudflared | grep trycloudflare.com
+   ```
+
+4. **Cadastre o webhook** no painel: Suas integrações > sua aplicação > **Webhooks > Configurar notificações** > aba **Modo de teste**, URL `https://<hostname>/webhooks/mercadopago`, evento **Order (Mercado Pago)**, Salvar. Guarde a URL em `MP_NOTIFICATION_URL` (referência) e copie a **assinatura secreta** gerada para `MP_WEBHOOK_SECRET` no `backend/.env`. Reinicie o backend: sem o segredo, todo webhook recebe 401.
+5. **Confira o caminho**: no painel, **Simular notificação**. O log do backend deve mostrar a requisição com 200 (order fictícia é ignorada). 401 = segredo errado ou ausente; erro de conexão = túnel caído ou backend parado.
+6. **Pague**: crie um evento com preço (perfil de organizador), reserve um ingresso, clique em **Pagar** e, na página do Mercado Pago, entre com um **comprador de teste** (painel > Contas de teste), de preferência em janela anônima. Cartão `5031 4332 1540 6351`, CVV `123`, validade `11/30`, titular `APRO` (aprovado) ou `OTHE` (recusado), CPF `12345678909`.
+7. **Volte para o site**: o Mercado Pago redireciona para `/payment/success|pending|failure`. A página consulta `GET /payments/:id` a cada 3 s até o webhook confirmar; o status mostrado é o da API, não o da URL.
+8. **Derrube o túnel** ao terminar: `docker compose --profile tunnel stop cloudflared`. Enquanto ele está no ar, **a API inteira** fica acessível pela URL pública (as rotas continuam exigindo sessão e o webhook exige assinatura, mas é exposição desnecessária).
+
+Observações:
+
+- A URL do quick tunnel muda a cada `up`: atualize o cadastro no painel (a assinatura secreta continua a mesma; dá para renová-la com "Redefinir").
+- A documentação do Mercado Pago avisa que pagamentos feitos com credenciais de teste podem não disparar notificações; se a tela ficar em "Aguardando a confirmação", valide o webhook com o "Simular notificação".
+- Métricas: `bilheteria_payments_{confirmed,rejected,refunded,not_approved,checkouts,webhooks_rejected}_total` no Prometheus (ver [backend/README.md#métricas-de-negócio](backend/README.md#métricas-de-negócio)).
+
 ## Próximos passos
 
-Faro no front (observabilidade do navegador), busca com Elasticsearch + Sequin e pagamento com Mercado Pago. Detalhes em [backend/README.md#próximos-passos](backend/README.md#próximos-passos).
+Busca com Elasticsearch + Sequin e pagamento com Mercado Pago estão feitos. Falta o Faro no front (observabilidade do navegador) e, no pagamento, preço por setor e reconciliação periódica. Detalhes em [backend/README.md#próximos-passos](backend/README.md#próximos-passos).
