@@ -58,6 +58,21 @@ describe("<ReserveTicketButton />", () => {
     expect(onReserved).toHaveBeenCalled();
   });
 
+  it("depois de reservar, oferece pagar com a contagem até o fim da reserva", async () => {
+    reserveTicket.mockResolvedValue({
+      id: 42,
+      user_id: "user-1",
+      event_id: 4,
+      reserved_at: new Date().toISOString(),
+      is_paid: false,
+    });
+    const { button } = setup();
+    await userEvent.click(button);
+
+    expect(await screen.findByRole("button", { name: "Pagar" })).toBeEnabled();
+    expect(screen.getByTestId("payment-countdown")).toHaveTextContent(/^0[45]:\d{2}$/);
+  });
+
   it("403: avisa e leva para cadastrar o CPF", async () => {
     reserveTicket.mockRejectedValue(nestError(403, "Cadastre seu CPF antes de reservar ingressos", "Forbidden"));
     const { button } = setup();

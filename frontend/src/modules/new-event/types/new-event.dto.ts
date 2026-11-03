@@ -9,6 +9,8 @@ export interface CreateEventRequest {
   starts_at: string;
   /** 1..100000 */
   capacity: number;
+  /** Preço único do ingresso em centavos (100..10.000.000). */
+  price_cents: number;
 }
 
 /** Resposta de POST /events */

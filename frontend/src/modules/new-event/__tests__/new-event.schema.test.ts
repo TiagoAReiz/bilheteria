@@ -6,6 +6,7 @@ const valid = {
   location: "Arena",
   starts_at: "2099-06-01T20:00",
   capacity: 100,
+  price: "50,00",
 };
 
 function issues(values: unknown) {
@@ -38,6 +39,21 @@ describe("newEventSchema", () => {
     expect(issues({ ...valid, capacity })).toEqual([msg]);
   });
 
+  it.each([
+    ["", "price: Informe o preço do ingresso"],
+    ["abc", "price: Preço inválido. Use, por exemplo, 50,00"],
+    ["-10", "price: Preço inválido. Use, por exemplo, 50,00"],
+    ["10,999", "price: Preço inválido. Use, por exemplo, 50,00"],
+    ["0,99", "price: O preço mínimo é R$ 1,00"],
+    ["100.000,01", "price: O preço máximo é R$ 100.000,00"],
+  ])("valida preço %p", (price, msg) => {
+    expect(issues({ ...valid, price })).toEqual([msg]);
+  });
+
+  it.each(["1,00", "50", "R$ 1.234,56", "100.000,00"])("aceita preço %p", (price) => {
+    expect(issues({ ...valid, price })).toEqual([]);
+  });
+
   it("toCreateEventRequest converte a data para ISO e omite descrição vazia", () => {
     const body = toCreateEventRequest(valid);
     expect(body).toEqual({
@@ -46,6 +62,7 @@ describe("newEventSchema", () => {
       location: "Arena",
       starts_at: new Date("2099-06-01T20:00").toISOString(),
       capacity: 100,
+      price_cents: 5000,
     });
   });
 });

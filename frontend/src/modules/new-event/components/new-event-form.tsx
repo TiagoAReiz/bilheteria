@@ -31,7 +31,7 @@ export function NewEventForm() {
     formState: { errors },
   } = useForm<NewEventFormValues>({
     resolver: zodResolver(newEventSchema),
-    defaultValues: { name: "", description: "", location: "", starts_at: "" },
+    defaultValues: { name: "", description: "", location: "", starts_at: "", price: "" },
   });
 
   async function onSubmit(values: NewEventFormValues) {
@@ -101,6 +101,23 @@ export function NewEventForm() {
               />
               <FieldError id="capacity-error" message={errors.capacity?.message} />
             </div>
+          </div>
+
+          <div className="space-y-2 sm:max-w-[calc(50%-0.5rem)]">
+            <Label htmlFor="price">Preço do ingresso (R$)</Label>
+            <Input
+              id="price"
+              inputMode="decimal"
+              placeholder="50,00"
+              autoComplete="off"
+              aria-invalid={!!errors.price || undefined}
+              aria-describedby="price-hint price-error"
+              {...register("price")}
+            />
+            <p id="price-hint" className="text-sm text-muted-foreground">
+              Preço único para todos os ingressos do evento, cobrado pelo Mercado Pago.
+            </p>
+            <FieldError id="price-error" message={errors.price?.message} />
           </div>
 
           <Button type="submit" disabled={loading}>

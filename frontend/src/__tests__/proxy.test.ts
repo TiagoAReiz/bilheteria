@@ -29,6 +29,6 @@ describe("proxy", () => {
   });
 
   it("só roda nas rotas privadas", () => {
-    expect(config.matcher).toEqual(["/profile/:path*", "/events/new"]);
+    expect(config.matcher).toEqual(["/profile/:path*", "/events/new", "/payment/:path*"]);
   });
 });

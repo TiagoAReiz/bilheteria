@@ -32,6 +32,24 @@ describe("<EventDetail />", () => {
     expect(screen.getByRole("button", { name: /reservar ingresso/i })).toBeEnabled();
   });
 
+  it("mostra o preço do ingresso em reais", async () => {
+    svc.getEvent.mockResolvedValue(makeEvent({ price_cents: 8990 }));
+    svc.getTicketStatus.mockResolvedValue({ total: 10, available: 5, reserved: 5 });
+    render(<EventDetail eventId={1} />);
+
+    expect(await screen.findByText(/R\$\s89,90/)).toBeInTheDocument();
+  });
+
+  it("evento sem preço (anterior ao pagamento): vendas indisponíveis e reserva desabilitada", async () => {
+    svc.getEvent.mockResolvedValue(makeEvent({ price_cents: null }));
+    svc.getTicketStatus.mockResolvedValue({ total: 10, available: 5, reserved: 5 });
+    render(<EventDetail eventId={1} />);
+
+    expect(await screen.findByText("Preço a definir")).toBeInTheDocument();
+    expect(screen.getByText("Vendas indisponíveis")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reservar ingresso/i })).toBeDisabled();
+  });
+
   it("marca como esgotado e desabilita a reserva", async () => {
     svc.getEvent.mockResolvedValue(makeEvent());
     svc.getTicketStatus.mockResolvedValue({ total: 10, available: 0, reserved: 10 });

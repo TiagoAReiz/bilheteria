@@ -9,6 +9,7 @@ import { Button } from "@/shared/components/ui/button";
 import { useSession } from "@/shared/hooks/useSession";
 import { buildLoginUrl } from "@/shared/lib/auth-redirect";
 import { formatTime } from "@/shared/lib/format";
+import { PayTicketButton } from "@/modules/payment/components/pay-ticket-button";
 import { isReserveError, useReserveTicket } from "../hooks/useReserveTicket";
 import { RESERVATION_TTL_MINUTES } from "../types/event-detail.dto";
 
@@ -56,11 +57,13 @@ export function ReserveTicketButton({ eventId, disabled, onReserved }: ReserveTi
         <Alert>
           <CheckCircle2Icon aria-hidden />
           <AlertTitle>Reserva #{result.ticket.id} confirmada</AlertTitle>
-          <AlertDescription>
+          <AlertDescription className="space-y-3">
             <p>
               Sua reserva expira em {RESERVATION_TTL_MINUTES} minutos (às {formatTime(result.expiresAt)}) se o pagamento
               não for concluído. Depois disso o ingresso volta a ficar disponível.
             </p>
+            {/* key: uma nova reserva recomeça a contagem e o estado do pagamento */}
+            <PayTicketButton key={result.ticket.id} ticketId={result.ticket.id} expiresAt={result.expiresAt} />
           </AlertDescription>
         </Alert>
       ) : null}

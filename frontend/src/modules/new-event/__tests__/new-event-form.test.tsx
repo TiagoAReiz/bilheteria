@@ -18,6 +18,7 @@ async function fillValid() {
   // datetime-local não aceita digitação no jsdom; define o valor diretamente
   fireEvent.input(screen.getByLabelText("Data e horário"), { target: { value: "2099-06-01T20:00" } });
   await userEvent.type(screen.getByLabelText("Capacidade"), "500");
+  await userEvent.type(screen.getByLabelText("Preço do ingresso (R$)"), "89,90");
 }
 
 describe("<NewEventForm />", () => {
@@ -31,6 +32,7 @@ describe("<NewEventForm />", () => {
     expect(screen.getByText("Informe o local")).toBeInTheDocument();
     expect(screen.getByText("Informe a data e o horário")).toBeInTheDocument();
     expect(screen.getByText("Informe a capacidade")).toBeInTheDocument();
+    expect(screen.getByText("Informe o preço do ingresso")).toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -46,9 +48,24 @@ describe("<NewEventForm />", () => {
       location: "Parque",
       starts_at: new Date("2099-06-01T20:00").toISOString(),
       capacity: 500,
+      // reais digitados viram centavos inteiros
+      price_cents: 8990,
     });
     expect(toast.success).toHaveBeenCalledWith("Evento criado com sucesso!");
     expect(push).toHaveBeenCalledWith("/events/33");
+  });
+
+  it("preço inválido mostra o erro no campo e não chama a API", async () => {
+    render(<NewEventForm />);
+    await fillValid();
+    const price = screen.getByLabelText("Preço do ingresso (R$)");
+    await userEvent.clear(price);
+    await userEvent.type(price, "0,50");
+    await userEvent.click(screen.getByRole("button", { name: "Criar evento" }));
+
+    expect(await screen.findByText(/O preço mínimo é R\$\s1,00/)).toBeInTheDocument();
+    expect(price).toHaveAttribute("aria-invalid", "true");
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("403: avisa que só organizadores podem criar", async () => {

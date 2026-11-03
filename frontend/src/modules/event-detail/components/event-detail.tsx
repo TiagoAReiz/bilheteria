@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, CalendarIcon, MapPinIcon, UsersIcon } from "lucide-react";
+import { ArrowLeftIcon, BanknoteIcon, CalendarIcon, MapPinIcon, UsersIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui
 import { Separator } from "@/shared/components/ui/separator";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { formatDateTime, formatNumber } from "@/shared/lib/format";
+import { formatBRL } from "@/shared/lib/money";
 import { useEventDetail } from "../hooks/useEventDetail";
 import { ReserveTicketButton } from "./reserve-ticket-button";
 import { TicketStatusCard } from "./ticket-status-card";
@@ -51,6 +52,8 @@ export function EventDetail({ eventId }: { eventId: number }) {
 
   const started = new Date(event.starts_at).getTime() <= openedAt;
   const soldOut = ticketStatus?.available === 0;
+  // evento criado antes do pagamento existir: sem preço, sem venda (o backend também recusa)
+  const notOnSale = event.price_cents === null;
 
   return (
     <div className="space-y-6">
@@ -61,6 +64,7 @@ export function EventDetail({ eventId }: { eventId: number }) {
             <CardTitle className="text-3xl">{event.name}</CardTitle>
             {soldOut ? <Badge variant="destructive">Esgotado</Badge> : null}
             {started ? <Badge variant="secondary">Vendas encerradas</Badge> : null}
+            {notOnSale && !started ? <Badge variant="secondary">Vendas indisponíveis</Badge> : null}
           </div>
           <div className="space-y-1 text-sm text-muted-foreground">
             <p className="flex items-center gap-2">
@@ -73,6 +77,16 @@ export function EventDetail({ eventId }: { eventId: number }) {
             <p className="flex items-center gap-2">
               <UsersIcon className="size-4" aria-hidden /> Capacidade: {formatNumber(event.capacity)} pessoas
             </p>
+            <p className="flex items-center gap-2">
+              <BanknoteIcon className="size-4" aria-hidden />
+              {event.price_cents === null ? (
+                "Preço a definir"
+              ) : (
+                <span>
+                  Ingresso: <strong className="text-foreground">{formatBRL(event.price_cents)}</strong>
+                </span>
+              )}
+            </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -84,7 +98,7 @@ export function EventDetail({ eventId }: { eventId: number }) {
           </section>
           <ReserveTicketButton
             eventId={event.id}
-            disabled={started || soldOut}
+            disabled={started || soldOut || notOnSale}
             onReserved={() => void reloadTicketStatus()}
           />
         </CardContent>
