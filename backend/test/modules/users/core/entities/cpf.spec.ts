@@ -27,6 +27,13 @@ describe('Cpf', () => {
     });
   });
 
+  it.each([
+    ['529.982.247-25', '***.982.247-**'],
+    ['11144477735', '***.444.777-**'],
+  ])('mascara %s como %s', (raw, masked) => {
+    expect(Cpf.create(raw)!.masked).toBe(masked);
+  });
+
   describe('CPFs inválidos', () => {
     it.each(['529.982.247-24', '529.982.247-15', '52998224735'])(
       'rejeita dígito verificador errado: %s',

@@ -24,11 +24,20 @@ describe("<CpfForm />", () => {
     expect(screen.getByText("não pode ser alterado depois")).toBeInTheDocument();
   });
 
-  it("registered: já mostra CPF cadastrado e trava o formulário", () => {
-    render(<CpfForm registered />);
+  it("registered: mostra só o CPF mascarado, sem campo nem botão", () => {
+    render(<CpfForm registered maskedCpf="***.982.247-**" />);
     expect(screen.getByText("CPF cadastrado")).toBeInTheDocument();
-    expect(getInput()).toBeDisabled();
-    expect(getSubmit()).toBeDisabled();
+    expect(screen.getByText("***.982.247-**")).toBeInTheDocument();
+    expect(screen.queryByLabelText("CPF")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /cadastrar cpf/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("não pode ser alterado depois")).not.toBeInTheDocument();
+  });
+
+  it("registered sem máscara (conta antiga): só avisa que está cadastrado", () => {
+    render(<CpfForm registered maskedCpf={null} />);
+    expect(screen.getByText("CPF cadastrado")).toBeInTheDocument();
+    expect(screen.queryByText(/\*\*\*/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("CPF")).not.toBeInTheDocument();
   });
 
   it("aplica a máscara enquanto digita", async () => {
@@ -45,7 +54,7 @@ describe("<CpfForm />", () => {
     expect(screen.getByText(/CPF inválido/)).toBeInTheDocument();
   });
 
-  it("cadastra e trava o campo explicando que não pode ser alterado", async () => {
+  it("cadastra, esconde o formulário e mostra o CPF mascarado", async () => {
     registerCpf.mockResolvedValue();
     render(<CpfForm />);
     await userEvent.type(getInput(), VALID_CPF);
@@ -53,9 +62,10 @@ describe("<CpfForm />", () => {
 
     expect(registerCpf).toHaveBeenCalledWith(VALID_CPF);
     expect(await screen.findByText("CPF cadastrado")).toBeInTheDocument();
-    expect(screen.getByText("Seu CPF foi cadastrado e não pode ser alterado.")).toBeInTheDocument();
-    expect(getInput()).toBeDisabled();
-    expect(getSubmit()).toBeDisabled();
+    expect(screen.getByText("***.982.247-**")).toBeInTheDocument();
+    expect(screen.getByText("Vinculado a esta conta e não pode ser alterado.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("CPF")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /cadastrar cpf/i })).not.toBeInTheDocument();
     expect(toast.success).toHaveBeenCalled();
   });
 
@@ -67,7 +77,7 @@ describe("<CpfForm />", () => {
     await userEvent.click(getSubmit());
 
     expect(await screen.findByText(msg)).toBeInTheDocument();
-    expect(getInput()).toBeDisabled();
+    expect(screen.queryByLabelText("CPF")).not.toBeInTheDocument();
   });
 
   it("409 de CPF de outra conta: mostra erro e deixa tentar de novo", async () => {

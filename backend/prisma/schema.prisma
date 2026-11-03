@@ -85,6 +85,8 @@ model user {
     avatarKey     String?   @map("avatar_key")
     role          Role      @default(USER)
     cpfHash       String?   @unique @map("cpf_hash")
+    // só para exibição no padrão de mercado (***.456.789-**); o CPF completo nunca é guardado
+    cpfMasked     String?   @map("cpf_masked")
     createdAt     DateTime  @default(now()) @map("created_at")
     updatedAt     DateTime  @updatedAt @map("updated_at")
     sessions      session[]

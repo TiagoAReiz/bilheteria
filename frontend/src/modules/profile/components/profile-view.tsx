@@ -47,7 +47,7 @@ export function ProfileView() {
       )}
 
       {/* espera o perfil para não piscar o formulário de quem já tem CPF */}
-      {loading ? null : <CpfForm returnTo={returnTo} registered={user?.hasCpf ?? false} />}
+      {loading ? null : <CpfForm returnTo={returnTo} registered={user?.hasCpf ?? false} maskedCpf={user?.cpfMasked ?? null} />}
     </div>
   );
 }

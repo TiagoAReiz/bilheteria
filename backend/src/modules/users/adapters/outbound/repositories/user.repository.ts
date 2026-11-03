@@ -1,7 +1,7 @@
 import {ConflictException, Injectable, NotFoundException} from "@nestjs/common";
 import {Prisma} from "../../../../../generated/prisma/client.js";
 import {PrismaService} from "../../../../prisma/prisma.service.js";
-import {UserRepositoryPort} from "../../../application/ports/outbound/repositories/user.repository.port.js";
+import {StoredCpf, UserRepositoryPort} from "../../../application/ports/outbound/repositories/user.repository.port.js";
 import {Role} from "../../../core/entities/role.js";
 
 @Injectable()
@@ -9,17 +9,17 @@ export class UserRepository implements UserRepositoryPort {
     constructor(private readonly prisma: PrismaService) {
     }
 
-    async getCpfHashById(id: string): Promise<string | null> {
-        const user = await this.prisma.user.findUnique({where: {id}, select: {cpfHash: true}});
+    async getCpfById(id: string): Promise<StoredCpf> {
+        const user = await this.prisma.user.findUnique({where: {id}, select: {cpfHash: true, cpfMasked: true}});
         if (user) {
-            return user.cpfHash;
+            return user;
         }
         throw new NotFoundException(`O usuário ${id} não foi encontrado`);
     }
 
-    async setCpfHashIfEmpty(id: string, cpfHash: string): Promise<boolean> {
+    async setCpfIfEmpty(id: string, cpfHash: string, cpfMasked: string): Promise<boolean> {
         try {
-            const {count} = await this.prisma.user.updateMany({where: {id, cpfHash: null}, data: {cpfHash}});
+            const {count} = await this.prisma.user.updateMany({where: {id, cpfHash: null}, data: {cpfHash, cpfMasked}});
             return count > 0;
         } catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {

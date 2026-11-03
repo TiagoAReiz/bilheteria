@@ -22,8 +22,8 @@ describe('UserService', () => {
 
   beforeEach(async () => {
     userRepository = {
-      getCpfHashById: vi.fn(),
-      setCpfHashIfEmpty: vi.fn(),
+      getCpfById: vi.fn(),
+      setCpfIfEmpty: vi.fn(),
       promoteToOrganizer: vi.fn(),
       replaceAvatarKey: vi.fn(),
     };
@@ -48,19 +48,19 @@ describe('UserService', () => {
         service.registerCpf('user-1', '123.456.789-00'),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(cpfHasher.hash).not.toHaveBeenCalled();
-      expect(userRepository.setCpfHashIfEmpty).not.toHaveBeenCalled();
+      expect(userRepository.setCpfIfEmpty).not.toHaveBeenCalled();
     });
 
     it('lança Conflict quando o usuário já tem CPF cadastrado', async () => {
-      userRepository.setCpfHashIfEmpty.mockResolvedValue(false);
+      userRepository.setCpfIfEmpty.mockResolvedValue(false);
 
       await expect(
         service.registerCpf('user-1', '529.982.247-25'),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('faz o hash do CPF normalizado e grava com setCpfHashIfEmpty', async () => {
-      userRepository.setCpfHashIfEmpty.mockResolvedValue(true);
+    it('faz o hash do CPF normalizado e grava com setCpfIfEmpty', async () => {
+      userRepository.setCpfIfEmpty.mockResolvedValue(true);
 
       await expect(
         service.registerCpf('user-1', '529.982.247-25'),
@@ -70,14 +70,15 @@ describe('UserService', () => {
       const cpfArg = cpfHasher.hash.mock.calls[0][0];
       expect(cpfArg).toBeInstanceOf(Cpf);
       expect(cpfArg.value).toBe('52998224725');
-      expect(userRepository.setCpfHashIfEmpty).toHaveBeenCalledWith(
+      expect(userRepository.setCpfIfEmpty).toHaveBeenCalledWith(
         'user-1',
         'hashed-cpf',
+        '***.982.247-**',
       );
     });
 
     it('propaga o Conflict do repositório (CPF vinculado a outra conta)', async () => {
-      userRepository.setCpfHashIfEmpty.mockRejectedValue(
+      userRepository.setCpfIfEmpty.mockRejectedValue(
         new ConflictException('Este CPF já está vinculado a outra conta'),
       );
 
@@ -89,14 +90,34 @@ describe('UserService', () => {
 
   describe('hasCpf', () => {
     it('retorna true quando existe hash', async () => {
-      userRepository.getCpfHashById.mockResolvedValue('abc');
+      userRepository.getCpfById.mockResolvedValue({ cpfHash: 'abc', cpfMasked: '***.982.247-**' });
       await expect(service.hasCpf('user-1')).resolves.toBe(true);
-      expect(userRepository.getCpfHashById).toHaveBeenCalledWith('user-1');
+      expect(userRepository.getCpfById).toHaveBeenCalledWith('user-1');
     });
 
     it('retorna false quando o hash é null', async () => {
-      userRepository.getCpfHashById.mockResolvedValue(null);
+      userRepository.getCpfById.mockResolvedValue({ cpfHash: null, cpfMasked: null });
       await expect(service.hasCpf('user-1')).resolves.toBe(false);
+    });
+  });
+
+  describe('getCpfStatus', () => {
+    it('devolve o CPF mascarado quando cadastrado', async () => {
+      userRepository.getCpfById.mockResolvedValue({ cpfHash: 'abc', cpfMasked: '***.982.247-**' });
+      await expect(service.getCpfStatus('user-1')).resolves.toEqual({
+        hasCpf: true,
+        cpfMasked: '***.982.247-**',
+      });
+    });
+
+    it('conta antiga (só hash) tem CPF mas sem mascarado', async () => {
+      userRepository.getCpfById.mockResolvedValue({ cpfHash: 'abc', cpfMasked: null });
+      await expect(service.getCpfStatus('user-1')).resolves.toEqual({ hasCpf: true, cpfMasked: null });
+    });
+
+    it('sem CPF', async () => {
+      userRepository.getCpfById.mockResolvedValue({ cpfHash: null, cpfMasked: null });
+      await expect(service.getCpfStatus('user-1')).resolves.toEqual({ hasCpf: false, cpfMasked: null });
     });
   });
 

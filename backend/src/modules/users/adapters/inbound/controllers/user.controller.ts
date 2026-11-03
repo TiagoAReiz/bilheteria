@@ -8,10 +8,10 @@ import {ConfirmImageUploadDto, CreateImageUploadDto} from "../../../../storage/a
 export class UserController {
   constructor(@Inject(USER_SERVICE) private readonly userService: UserServicePort) {}
 
-  /** Usuário da sessão + `hasCpf` (o hash do CPF nunca sai da API; o front só precisa saber se existe). */
+  /** Usuário da sessão + `hasCpf` e `cpfMasked` (***.456.789-**); o hash do CPF nunca sai da API. */
   @Get("me")
   async me(@Session() session: UserSession) {
-    return {...session.user, hasCpf: await this.userService.hasCpf(session.user.id)};
+    return {...session.user, ...(await this.userService.getCpfStatus(session.user.id))};
   }
 
   @Patch("me/cpf")

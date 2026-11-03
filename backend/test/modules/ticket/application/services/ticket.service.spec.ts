@@ -79,6 +79,7 @@ describe('TicketService', () => {
     userService = {
       registerCpf: vi.fn(),
       hasCpf: vi.fn().mockResolvedValue(true),
+      getCpfStatus: vi.fn(),
       becomeOrganizer: vi.fn(),
       createAvatarUpload: vi.fn(),
       confirmAvatar: vi.fn(),

@@ -1,5 +1,5 @@
 import { VALID_CPF } from "@test/helpers";
-import { isValidCpf, maskCpf, onlyDigits } from "@/shared/lib/cpf";
+import { isValidCpf, maskCpf, maskCpfForDisplay, onlyDigits } from "@/shared/lib/cpf";
 
 describe("cpf", () => {
   it.each([
@@ -25,5 +25,14 @@ describe("cpf", () => {
     expect(isValidCpf("52998224724")).toBe(false);
     expect(isValidCpf("11111111111")).toBe(false);
     expect(isValidCpf("123")).toBe(false);
+  });
+});
+
+describe("maskCpfForDisplay", () => {
+  it.each([
+    ["52998224725", "***.982.247-**"],
+    ["529.982.247-25", "***.982.247-**"],
+  ])("%s → %s", (raw, masked) => {
+    expect(maskCpfForDisplay(raw)).toBe(masked);
   });
 });

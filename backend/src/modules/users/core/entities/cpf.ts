@@ -6,6 +6,11 @@ export class Cpf {
         return Cpf.isValid(digits) ? new Cpf(digits) : null;
     }
 
+    /** Padrão de mercado: só os 6 dígitos do meio aparecem (***.456.789-**). */
+    get masked(): string {
+        return `***.${this.value.slice(3, 6)}.${this.value.slice(6, 9)}-**`;
+    }
+
     private static isValid(digits: string): boolean {
         if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) {
             return false;

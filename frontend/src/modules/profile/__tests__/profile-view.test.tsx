@@ -27,7 +27,7 @@ jest.mock("@/shared/lib/image-upload", () => ({
 const svc = jest.mocked(profileService);
 
 function makeMe(overrides: Partial<UserMeResponse> = {}): UserMeResponse {
-  return { ...makeUser(), hasCpf: false, ...overrides };
+  return { ...makeUser(), hasCpf: false, cpfMasked: null, ...overrides };
 }
 
 describe("<ProfileView />", () => {
@@ -115,12 +115,13 @@ describe("<ProfileView />", () => {
       expect(screen.queryByText("CPF cadastrado")).not.toBeInTheDocument();
     });
 
-    it("conta com CPF vê o aviso de cadastrado e o campo travado", async () => {
-      svc.getMe.mockResolvedValue(makeMe({ hasCpf: true }));
+    it("conta com CPF vê só o CPF mascarado, sem campo nem botão", async () => {
+      svc.getMe.mockResolvedValue(makeMe({ hasCpf: true, cpfMasked: "***.982.247-**" }));
       render(<ProfileView />);
       expect(await screen.findByText("CPF cadastrado")).toBeInTheDocument();
-      expect(screen.getByLabelText("CPF")).toBeDisabled();
-      expect(screen.getByRole("button", { name: /cadastrar cpf/i })).toBeDisabled();
+      expect(screen.getByText("***.982.247-**")).toBeInTheDocument();
+      expect(screen.queryByLabelText("CPF")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /cadastrar cpf/i })).not.toBeInTheDocument();
     });
   });
 });

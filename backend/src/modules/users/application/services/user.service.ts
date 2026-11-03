@@ -23,7 +23,7 @@ export class UserService implements UserServicePort {
     if (!cpf) {
       throw new BadRequestException('CPF inválido');
     }
-    if (!(await this.userRepository.setCpfHashIfEmpty(userId, this.cpfHasher.hash(cpf)))) {
+    if (!(await this.userRepository.setCpfIfEmpty(userId, this.cpfHasher.hash(cpf), cpf.masked))) {
       throw new ConflictException('O CPF deste usuário já foi cadastrado e não pode ser alterado');
     }
   }
@@ -53,6 +53,11 @@ export class UserService implements UserServicePort {
   }
 
   async hasCpf(userId: string): Promise<boolean> {
-    return (await this.userRepository.getCpfHashById(userId)) !== null;
+    return (await this.getCpfStatus(userId)).hasCpf;
+  }
+
+  async getCpfStatus(userId: string): Promise<{hasCpf: boolean; cpfMasked: string | null}> {
+    const {cpfHash, cpfMasked} = await this.userRepository.getCpfById(userId);
+    return {hasCpf: cpfHash !== null, cpfMasked: cpfHash !== null ? cpfMasked : null};
   }
 }

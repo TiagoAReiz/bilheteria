@@ -23,3 +23,9 @@ export function isValidCpf(value: string): boolean {
   };
   return checkDigit(9) === Number(digits[9]) && checkDigit(10) === Number(digits[10]);
 }
+
+/** Exibição no padrão de mercado (LGPD): só os 6 dígitos do meio, ex. ***.982.247-**. */
+export function maskCpfForDisplay(value: string): string {
+  const d = onlyDigits(value).padEnd(11, "*");
+  return `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**`;
+}

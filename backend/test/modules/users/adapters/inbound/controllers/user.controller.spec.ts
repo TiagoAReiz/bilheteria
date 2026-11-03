@@ -31,6 +31,7 @@ describe('UserController', () => {
     userService = {
       registerCpf: vi.fn(),
       hasCpf: vi.fn(),
+      getCpfStatus: vi.fn(),
       becomeOrganizer: vi.fn(),
       createAvatarUpload: vi.fn(),
       confirmAvatar: vi.fn(),
@@ -61,19 +62,20 @@ describe('UserController', () => {
   });
 
   describe('me', () => {
-    it('retorna o usuário da sessão com hasCpf', async () => {
-      userService.hasCpf.mockResolvedValue(true);
+    it('retorna o usuário da sessão com hasCpf e o CPF mascarado', async () => {
+      userService.getCpfStatus.mockResolvedValue({ hasCpf: true, cpfMasked: '***.982.247-**' });
       await expect(controller.me(session)).resolves.toEqual({
         ...session.user,
         hasCpf: true,
+        cpfMasked: '***.982.247-**',
       });
-      expect(userService.hasCpf).toHaveBeenCalledWith('user-1');
+      expect(userService.getCpfStatus).toHaveBeenCalledWith('user-1');
       expect(userService.registerCpf).not.toHaveBeenCalled();
     });
 
     it('hasCpf false quando a conta ainda não tem CPF', async () => {
-      userService.hasCpf.mockResolvedValue(false);
-      await expect(controller.me(session)).resolves.toMatchObject({ hasCpf: false });
+      userService.getCpfStatus.mockResolvedValue({ hasCpf: false, cpfMasked: null });
+      await expect(controller.me(session)).resolves.toMatchObject({ hasCpf: false, cpfMasked: null });
     });
 
     it('é mapeada em GET /users/me', () => {
