@@ -17,11 +17,17 @@ describe('UserRepository', () => {
       findUnique: Mock;
       updateMany: Mock;
     };
+    $transaction: Mock;
   };
+  let tx: { $queryRaw: Mock; user: { update: Mock } };
   let repository: UserRepository;
 
   beforeEach(() => {
-    prisma = { user: { findUnique: vi.fn(), updateMany: vi.fn() } };
+    tx = { $queryRaw: vi.fn(), user: { update: vi.fn() } };
+    prisma = {
+      user: { findUnique: vi.fn(), updateMany: vi.fn() },
+      $transaction: vi.fn((work: (t: typeof tx) => unknown) => work(tx)),
+    };
     repository = new UserRepository(prisma as unknown as PrismaService);
   });
 
@@ -122,6 +128,28 @@ describe('UserRepository', () => {
       await expect(
         repository.promoteToOrganizer('admin-1'),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('replaceAvatarKey', () => {
+    it('trava a linha, troca a chave e devolve a anterior e a foto do provedor', async () => {
+      tx.$queryRaw.mockResolvedValue([{ avatar_key: 'old', image: 'https://google/foto.jpg' }]);
+
+      await expect(repository.replaceAvatarKey('user-1', 'new')).resolves.toEqual({
+        previousKey: 'old',
+        image: 'https://google/foto.jpg',
+      });
+      const [sql] = tx.$queryRaw.mock.calls[0] as [TemplateStringsArray];
+      expect(sql.join('?').replace(/\s+/g, ' ').trim()).toBe(
+        'SELECT avatar_key, image FROM users WHERE id = ? FOR UPDATE',
+      );
+      expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'user-1' }, data: { avatarKey: 'new' } });
+    });
+
+    it('usuário inexistente: NotFound', async () => {
+      tx.$queryRaw.mockResolvedValue([]);
+      await expect(repository.replaceAvatarKey('x', null)).rejects.toBeInstanceOf(NotFoundException);
+      expect(tx.user.update).not.toHaveBeenCalled();
     });
   });
 });

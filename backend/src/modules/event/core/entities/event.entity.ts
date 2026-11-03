@@ -9,6 +9,8 @@ export class Event {
     price_cents: number | null;
     // contador aproximado (job de disponibilidade); o numero exato vem do GET /status/:id
     available_tickets: number;
+    // chave da capa no bucket; a API responde `cover_url` (ver EventView)
+    cover_key: string | null;
     organizer_id: string;
     created_at: Date;
     updated_at: Date;

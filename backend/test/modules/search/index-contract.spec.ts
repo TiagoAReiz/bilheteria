@@ -56,6 +56,22 @@ describe('contrato do índice de busca', () => {
       expect(mapping.capacity.type).toBe('integer');
       expect(mapping.organizer_id.type).toBe('keyword');
       expect(mapping.deleted.type).toBe('boolean');
+      // só a chave: a URL depende de STORAGE_PUBLIC_URL; nunca é buscada nem agregada
+      expect(mapping.cover_key).toEqual({ type: 'keyword', index: false, doc_values: false });
+    });
+
+    it('os campos adicionados ao índice existente (mapping-additions) são iguais aos do template', () => {
+      const additions = (
+        JSON.parse(
+          readFileSync(
+            resolve(SEARCH_INFRA, 'elasticsearch/mapping-additions/events.json'),
+            'utf8',
+          ),
+        ) as { properties: Mapping }
+      ).properties;
+      for (const [field, definition] of Object.entries(additions)) {
+        expect(mapping[field]).toEqual(definition);
+      }
     });
   });
 

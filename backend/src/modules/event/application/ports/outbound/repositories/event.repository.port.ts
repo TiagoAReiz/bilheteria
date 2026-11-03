@@ -1,5 +1,6 @@
 import {Event} from "../../../../core/entities/event.entity.js";
 import {NewEvent} from "../../../../core/entities/new-event.entity.js";
+import {EventWithPhotos} from "../../../../core/entities/event-image.entity.js";
 
 export const EVENT_REPOSITORY = Symbol('EVENT_REPOSITORY');
 
@@ -7,6 +8,8 @@ export interface EventRepositoryPort {
     createWithTickets(event: NewEvent): Promise<Event>;
     getUpcomingEvents(): Promise<Event[]>;
     getEventById(id: number): Promise<Event>;
+    /** O evento com a galeria ordenada por `position`; NotFound se não existe ou foi excluído. */
+    getEventWithPhotos(id: number): Promise<EventWithPhotos>;
     getEventIdsByOrganizer(organizerId: string): Promise<number[]>;
     /**
      * Recalcula em lote `available_tickets` dos eventos futuros e só grava onde o valor mudou

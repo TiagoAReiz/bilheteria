@@ -9,7 +9,18 @@ jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams
 jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
 jest.mock("@/shared/hooks/useSession", () => ({ useSession: jest.fn() }));
 jest.mock("../services/profile.service", () => ({
-  profileService: { getMe: jest.fn(), registerCpf: jest.fn(), becomeOrganizer: jest.fn() },
+  profileService: {
+    getMe: jest.fn(),
+    registerCpf: jest.fn(),
+    becomeOrganizer: jest.fn(),
+    createAvatarUpload: jest.fn(),
+    confirmAvatar: jest.fn(),
+    removeAvatar: jest.fn(),
+  },
+}));
+jest.mock("@/shared/lib/image-upload", () => ({
+  ...jest.requireActual("@/shared/lib/image-upload"),
+  uploadToPresignedPost: jest.fn().mockResolvedValue(undefined),
 }));
 
 const svc = jest.mocked(profileService);
@@ -49,5 +60,45 @@ describe("<ProfileView />", () => {
     expect(svc.becomeOrganizer).toHaveBeenCalled();
     expect(await screen.findByText("Organizador")).toBeInTheDocument();
     expect(session.refresh).toHaveBeenCalled();
+  });
+
+  describe("foto de perfil", () => {
+    it("mostra a foto enviada no lugar da do Google", async () => {
+      svc.getMe.mockResolvedValue(
+        makeUser({ image: "https://google/foto.jpg", avatarUrl: "http://cdn/users/u/avatar/a.png", avatarKey: "users/u/avatar/a.png" }),
+      );
+      render(<ProfileView />);
+      expect(await screen.findByRole("button", { name: /remover foto/i })).toBeInTheDocument();
+    });
+
+    it("sem foto enviada não oferece remover", async () => {
+      svc.getMe.mockResolvedValue(makeUser({ image: "https://google/foto.jpg", avatarKey: null }));
+      render(<ProfileView />);
+      expect(await screen.findByRole("button", { name: /trocar foto/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /remover foto/i })).not.toBeInTheDocument();
+    });
+
+    it("trocar a foto envia direto ao bucket, confirma e recarrega perfil e sessão (header)", async () => {
+      const session = sessionValue(makeUser());
+      jest.mocked(useSession).mockReturnValue(session);
+      svc.getMe.mockResolvedValue(makeUser());
+      svc.createAvatarUpload.mockResolvedValue({
+        url: "http://s3/b",
+        fields: {},
+        key: "users/user-1/avatar/a.png",
+        max_bytes: 5242880,
+        expires_at: "2099-01-01T00:00:00.000Z",
+      });
+      svc.confirmAvatar.mockResolvedValue({ avatar_url: "http://cdn/users/user-1/avatar/a.png" });
+      render(<ProfileView />);
+
+      const input = await screen.findByLabelText("Escolher foto de perfil");
+      await userEvent.upload(input, new File([new Uint8Array([0x89, 0x50])], "eu.png", { type: "image/png" }));
+
+      expect(svc.createAvatarUpload).toHaveBeenCalledWith("image/png");
+      expect(svc.confirmAvatar).toHaveBeenCalledWith("users/user-1/avatar/a.png");
+      expect(session.refresh).toHaveBeenCalled();
+      expect(svc.getMe).toHaveBeenCalledTimes(2);
+    });
   });
 });

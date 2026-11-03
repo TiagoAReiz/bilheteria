@@ -27,15 +27,20 @@ export interface EventSearchItem {
     capacity: number;
     // aproximado (atualizado em lote); o numero exato vem do GET /status/:id
     available_tickets: number;
+    // URL publica da capa (montada pela API a partir da chave indexada)
+    cover_url: string | null;
 }
+
+/** Item como vem do indice: a capa ainda e so a chave do objeto no bucket. */
+export type EventSearchHit = Omit<EventSearchItem, 'cover_url'> & {cover_key: string | null};
 
 export interface FacetBucket {
     value: string;
     count: number;
 }
 
-export interface EventSearchResult {
-    items: EventSearchItem[];
+export interface EventSearchResult<T = EventSearchItem> {
+    items: T[];
     total: number;
     page: number;
     size: number;

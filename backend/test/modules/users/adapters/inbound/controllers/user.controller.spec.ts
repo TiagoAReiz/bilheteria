@@ -32,6 +32,9 @@ describe('UserController', () => {
       registerCpf: vi.fn(),
       hasCpf: vi.fn(),
       becomeOrganizer: vi.fn(),
+      createAvatarUpload: vi.fn(),
+      confirmAvatar: vi.fn(),
+      removeAvatar: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -48,6 +51,9 @@ describe('UserController', () => {
       handlerOf(UserController, 'me'),
       handlerOf(UserController, 'registerCpf'),
       handlerOf(UserController, 'becomeOrganizer'),
+      handlerOf(UserController, 'createAvatarUpload'),
+      handlerOf(UserController, 'confirmAvatar'),
+      handlerOf(UserController, 'removeAvatar'),
     ]) {
       expect(reflector.get(PUBLIC_KEY, handler)).toBeUndefined();
       expect(reflector.get(ROLES_KEY, handler)).toBeUndefined();
@@ -110,6 +116,27 @@ describe('UserController', () => {
         RequestMethod.PATCH,
       );
       expect(Reflect.getMetadata(HTTP_CODE_METADATA, handler)).toBe(204);
+    });
+  });
+
+  describe('avatar', () => {
+    it.each([
+      ['createAvatarUpload', RequestMethod.POST, 'me/avatar/upload-url'],
+      ['confirmAvatar', RequestMethod.PUT, 'me/avatar'],
+      ['removeAvatar', RequestMethod.DELETE, 'me/avatar'],
+    ] as const)('%s: %s /users/%s', (method, verb, path) => {
+      const handler = handlerOf(UserController, method);
+      expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(path);
+      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(verb);
+    });
+
+    it('sempre usa o id da sessão', async () => {
+      await controller.createAvatarUpload(session, { content_type: 'image/webp' });
+      await controller.confirmAvatar(session, { key: 'k' });
+      await controller.removeAvatar(session);
+      expect(userService.createAvatarUpload).toHaveBeenCalledWith('user-1', 'image/webp');
+      expect(userService.confirmAvatar).toHaveBeenCalledWith('user-1', 'k');
+      expect(userService.removeAvatar).toHaveBeenCalledWith('user-1');
     });
   });
 });

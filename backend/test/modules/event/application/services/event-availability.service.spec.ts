@@ -16,6 +16,7 @@ describe('EventAvailabilityService', () => {
       createWithTickets: vi.fn(),
       getUpcomingEvents: vi.fn(),
       getEventById: vi.fn(),
+      getEventWithPhotos: vi.fn(),
       getEventIdsByOrganizer: vi.fn(),
       refreshAvailableTickets: vi.fn(),
     };

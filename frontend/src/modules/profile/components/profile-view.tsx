@@ -18,7 +18,8 @@ export function ProfileView() {
   const { user, loading, error, reload } = useProfile();
   const { refresh } = useSession();
 
-  async function handleBecameOrganizer() {
+  // perfil e sessão juntos: o header lê a sessão (papel, foto)
+  async function reloadProfileAndSession() {
     await Promise.all([reload(), refresh()]);
   }
 
@@ -40,8 +41,8 @@ export function ProfileView() {
         </Alert>
       ) : (
         <>
-          <ProfileCard user={user} />
-          {user.role === "USER" ? <BecomeOrganizerCard onBecameOrganizer={handleBecameOrganizer} /> : null}
+          <ProfileCard user={user} onAvatarChanged={reloadProfileAndSession} />
+          {user.role === "USER" ? <BecomeOrganizerCard onBecameOrganizer={reloadProfileAndSession} /> : null}
         </>
       )}
 

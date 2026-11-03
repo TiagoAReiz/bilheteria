@@ -1,6 +1,7 @@
 include:
   - infra/search/compose.search.yaml   # Elasticsearch + Sequin (busca por CDC)
   - infra/payment/compose.payment.yaml # túnel do webhook do Mercado Pago (profile tunnel)
+  - infra/storage/compose.storage.yaml # S3 (LocalStack) das imagens de eventos e avatares
 
 services:
 

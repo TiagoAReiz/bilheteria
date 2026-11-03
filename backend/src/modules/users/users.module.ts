@@ -11,6 +11,11 @@ import {CpfHasher} from "./adapters/outbound/crypto/cpf-hasher.js";
 import {USER_SERVICE} from "./application/ports/inbound/services/user.service.port.js";
 import {USER_REPOSITORY} from "./application/ports/outbound/repositories/user.repository.port.js";
 import {CPF_HASHER} from "./application/ports/outbound/crypto/cpf-hasher.port.js";
+import {StorageModule} from "../storage/storage.module.js";
+import {
+    IMAGE_STORAGE_SERVICE,
+    type ImageStorageServicePort,
+} from "../storage/application/ports/inbound/services/image-storage.service.port.js";
 
 @Module({
   controllers: [UserController],
@@ -18,11 +23,12 @@ import {CPF_HASHER} from "./application/ports/outbound/crypto/cpf-hasher.port.js
   exports: [USER_SERVICE],
   imports: [
       PrismaModule,
+      StorageModule,
       AuthModule.forRootAsync({
-          imports: [PrismaModule],
-          inject: [PrismaService, ConfigService],
-          useFactory: (prisma: PrismaService, config: ConfigService) => ({
-              auth: createAuth(prisma, config),
+          imports: [PrismaModule, StorageModule],
+          inject: [PrismaService, ConfigService, IMAGE_STORAGE_SERVICE],
+          useFactory: (prisma: PrismaService, config: ConfigService, images: ImageStorageServicePort) => ({
+              auth: createAuth(prisma, config, (key) => images.publicUrl(key)),
           }),
       }),
   ],

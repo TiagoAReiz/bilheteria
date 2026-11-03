@@ -42,6 +42,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   capacity: 100,
   price_cents: 5000,
   available_tickets: 100,
+  cover_key: null,
   organizer_id: 'org-1',
   created_at: NOW,
   updated_at: NOW,
@@ -79,11 +80,15 @@ describe('TicketService', () => {
       registerCpf: vi.fn(),
       hasCpf: vi.fn().mockResolvedValue(true),
       becomeOrganizer: vi.fn(),
+      createAvatarUpload: vi.fn(),
+      confirmAvatar: vi.fn(),
+      removeAvatar: vi.fn(),
     };
     eventService = {
       createEvent: vi.fn(),
       listUpcomingEvents: vi.fn(),
       getEventById: vi.fn().mockResolvedValue(makeEvent()),
+      getEventDetail: vi.fn(),
       getEventIdsByOrganizer: vi.fn(),
     };
 

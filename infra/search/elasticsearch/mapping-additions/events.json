@@ -1,0 +1,5 @@
+{
+  "properties": {
+    "cover_key": { "type": "keyword", "index": false, "doc_values": false }
+  }
+}

@@ -2,6 +2,7 @@ import { AxiosError, AxiosHeaders, type AxiosResponse } from "axios";
 import type { EventResponse } from "@/shared/types/event";
 import type { EventSearchItem, SearchEventsResponse } from "@/modules/events/types/event-search.dto";
 import type { User } from "@/shared/types/user";
+import type { EventDetailResponse } from "@/modules/event-detail/types/event-detail.dto";
 
 /** Cria um erro do axios no formato que o NestJS devolve. */
 export function nestError(status: number, message: string | string[] = "erro", error = "Error"): AxiosError {
@@ -25,12 +26,17 @@ export function makeEvent(overrides: Partial<EventResponse> = {}): EventResponse
     starts_at: "2099-05-10T22:00:00.000Z",
     capacity: 100,
     price_cents: 5000,
+    cover_url: null,
     organizer_id: "org-1",
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     deleted_at: null,
     ...overrides,
   };
+}
+
+export function makeEventDetail(overrides: Partial<EventDetailResponse> = {}): EventDetailResponse {
+  return { ...makeEvent(), photos: [], ...overrides };
 }
 
 export function makeSearchItem(overrides: Partial<EventSearchItem> = {}): EventSearchItem {
@@ -42,6 +48,7 @@ export function makeSearchItem(overrides: Partial<EventSearchItem> = {}): EventS
     starts_at: "2099-05-10T22:00:00.000Z",
     capacity: 100,
     available_tickets: 40,
+    cover_url: null,
     ...overrides,
   };
 }
