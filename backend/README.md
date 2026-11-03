@@ -102,12 +102,16 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 - Contas Google e Facebook com o mesmo e-mail são vinculadas ao mesmo usuário.
 - `role` (`USER`, `ADMIN`, `ORGANIZER`) começa como `USER` e não pode ser enviada pelo cliente. `ORGANIZER` é obtido via `PATCH /users/me/organizer`; `ADMIN` só é atribuído direto no banco.
 - **CPF**: guardado em `users.cpf_hash` como HMAC-SHA256 com `CPF_HASH_SECRET` (determinístico para garantir CPF único por conta). Cadastrado uma única vez via `PATCH /users/me/cpf` e nunca alterado; não sai na sessão.
+- **Avatar**: `users.image` continua sendo a foto do Google/Facebook (Better Auth). O avatar enviado fica em `users.avatar_key` (campo do Better Auth com `input: false`: o `/api/auth/update-user` recusa com `FIELD_NOT_ALLOWED`). O plugin `customSession` acrescenta `avatarUrl` (enviado ?? `image`) ao `user` da sessão: o front lê de `/api/auth/get-session` e o `GET /users/me` devolve o mesmo. Upload: ver [Armazenamento de imagens](#armazenamento-de-imagens).
 
 | Método | Rota | Auth | Descrição |
 | --- | --- | --- | --- |
-| GET | `/users/me` | sim | usuário da sessão |
+| GET | `/users/me` | sim | usuário da sessão (com `avatarUrl` e `avatarKey`) |
 | PATCH | `/users/me/cpf` | sim | cadastra o CPF (uma vez) |
 | PATCH | `/users/me/organizer` | sim | vira `ORGANIZER` (sem restrições por enquanto) |
+| POST | `/users/me/avatar/upload-url` | sim | `{ content_type }` → POST pré-assinado `{ url, fields, key, max_bytes, expires_at }` |
+| PUT | `/users/me/avatar` | sim | `{ key }` confere no bucket, troca o avatar e apaga o anterior → `{ avatar_url }` |
+| DELETE | `/users/me/avatar` | sim | volta para a foto do provedor → `{ avatar_url }` (null = sem foto) |
 
 ### event
 
@@ -116,11 +120,20 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 - Listagem mostra só eventos futuros e não excluídos (`deleted_at`).
 - `price_cents`: preço único do ingresso em centavos de BRL, obrigatório, inteiro de 100 (R$ 1,00) a 10.000.000 (R$ 100.000,00). Eventos anteriores ao pagamento têm `null` (sem venda; ver [payment](#payment)).
 
+- **Imagens**: uma capa (`event.cover_key`) e uma galeria de até 10 fotos (`event_photo`, ordenadas por `position`). Só o organizador que criou o evento ou um `ADMIN` mexem (403 para os demais, 404 para evento inexistente/excluído). As respostas trazem `cover_url` (e `photos` no detalhe), nunca a chave. Fluxo e regras em [Armazenamento de imagens](#armazenamento-de-imagens).
+
 | Método | Rota | Auth | Descrição |
 | --- | --- | --- | --- |
 | POST | `/events` | `ORGANIZER`/`ADMIN` | `{ name, description?, location, starts_at, capacity, price_cents }` |
-| GET | `/events` | não | próximos eventos |
-| GET | `/events/:id` | não | detalhe do evento |
+| GET | `/events` | não | próximos eventos (com `cover_url`) |
+| GET | `/events/:id` | não | detalhe do evento com `cover_url` e `photos: [{ id, url, position }]` em ordem |
+| POST | `/events/:id/cover/upload-url` | dono/`ADMIN` | `{ content_type }` → POST pré-assinado |
+| PUT | `/events/:id/cover` | dono/`ADMIN` | `{ key }` confirma e troca a capa (apaga a anterior) → `{ cover_url }` |
+| DELETE | `/events/:id/cover` | dono/`ADMIN` | remove a capa (204) |
+| POST | `/events/:id/photos/upload-url` | dono/`ADMIN` | `{ content_type }` → POST pré-assinado; 409 se a galeria já tem 10 |
+| POST | `/events/:id/photos` | dono/`ADMIN` | `{ key }` confirma e adiciona no fim → `{ photos }`; 409 se lotou |
+| PATCH | `/events/:id/photos/order` | dono/`ADMIN` | `{ photo_ids }` (todas as fotos, na nova ordem) → `{ photos }`; 400 se não for exatamente a galeria |
+| DELETE | `/events/:id/photos/:photoId` | dono/`ADMIN` | remove a foto e o objeto (204) |
 
 ### ticket
 
@@ -301,6 +314,61 @@ O índice não recebe uma mensagem a cada reserva: isso geraria um UPDATE em `ev
 
 Todos os testes rodam sem Elasticsearch: o client é mockado e os testes conferem a query montada (`test/modules/*/adapters/outbound/search/`). Também cobrem o 503 por tipo de falha, os DTOs (conversão da query string e limites), o escopo ADMIN/ORGANIZER, o job (intervalo, desligado, sem sobreposição, só atualiza o que mudou) e o contrato mapping ↔ transform ↔ adapter (`test/modules/search/index-contract.spec.ts`). O e2e sobe o app com o ES numa porta fechada e confere o 503, a ordem das rotas e que o resto da API continua respondendo.
 
+## Armazenamento de imagens
+
+Capa e galeria dos eventos e avatar dos usuários ficam num bucket S3 (em dev, o LocalStack de `infra/storage`; infra no [README da raiz](../README.md#armazenamento-de-imagens-s3--localstack)). Guarda-se o **arquivo original** (sem redimensionar nem gerar miniaturas). A API **nunca recebe os bytes**.
+
+### Fluxo: presign → upload direto → confirm
+
+1. **`POST .../upload-url { content_type }`**: a API confere quem pode (dono do evento/`ADMIN`, ou o próprio usuário no avatar) e o tipo (`image/jpeg`, `image/png`, `image/webp`), **gera a chave** (`events/<id>/cover/<uuid>.<ext>`, `events/<id>/photos/<uuid>.<ext>`, `users/<id>/avatar/<uuid>.<ext>`; nunca o nome do arquivo do cliente) e assina um **POST pré-assinado** válido por 5 minutos. A política do POST fixa a chave, o `Content-Type` e o `Cache-Control` (`immutable`: cada envio tem chave nova) e limita o tamanho com `content-length-range` de 1 B a 5 MB. Por isso POST e não PUT pré-assinado: o PUT não consegue limitar o tamanho.
+2. **O navegador envia direto ao bucket** (`multipart/form-data`: os `fields` devolvidos e o arquivo por último, no campo `file`). O S3 recusa arquivo grande (400 `EntityTooLarge`), outro tipo ou outra chave (403).
+3. **`PUT .../cover`, `POST .../photos` ou `PUT /users/me/avatar` com `{ key }`**: a API confere que a chave é do prefixo daquele recurso (chave de outro evento/usuário é 400 sem tocar no bucket), faz `HeadObject` (existe? tamanho entre 1 B e 5 MB? `Content-Type` igual ao da extensão?) e lê os **12 primeiros bytes** para conferir a assinatura do formato (JPEG `FFD8FF`, PNG `89504E47…`, WebP `RIFF….WEBP`). Objeto inválido é apagado e a resposta é 400. Só então a chave é gravada no Postgres.
+4. **Substituir/remover** (capa, avatar, foto da galeria) apaga o objeto antigo do bucket **depois** de gravar a referência nova. É melhor esforço: falha vira log `warn` e `bilheteria_images_delete_failures_total`, nunca erro para o usuário. Confirmar duas vezes a mesma chave não duplica nem apaga a imagem atual.
+
+Outras garantias:
+
+- **Galeria até 10**: a confirmação trava a linha do evento (`SELECT ... FOR UPDATE`), conta e insere na mesma transação; confirmações simultâneas entram em fila e a 11ª recebe 409 (o objeto dela é apagado). O `upload-url` também recusa com a galeria cheia, mas só para poupar o envio. Conferido com 12 confirmações paralelas: 10 gravadas, 2 × 409.
+- **Ordem**: `(event_id, position)` é único; `PATCH .../photos/order` recebe a galeria inteira na ordem nova, passa por posições negativas e grava 0..n-1 na mesma transação.
+- **Leitura pública**: a URL servida é `STORAGE_PUBLIC_URL + "/" + chave`. O banco guarda só a chave, então trocar de provedor ou pôr um CDN na frente não mexe no banco.
+- **Bucket fora do ar**: as rotas de upload/confirmação respondem 503; o resto da API não depende do S3 (o client não conecta ao subir).
+- **Não feito**: uploads pré-assinados que nunca são confirmados deixam o objeto no bucket (a chave já é a final). Em produção, dá para limpar com um job ou enviar para um prefixo `tmp/` com regra de *lifecycle* e copiar na confirmação.
+
+### Peças no código
+
+| Peça | Arquivo | Papel |
+| --- | --- | --- |
+| regras | `storage/core/entities/image.ts` | tipos aceitos, 5 MB, prefixos, formato da chave, assinatura dos formatos |
+| `IMAGE_STORAGE_SERVICE` | `storage/application/services/image-storage.service.ts` | porta inbound usada por `event` e `users`: presign, confirmação, URL pública, remoção silenciosa |
+| `OBJECT_STORAGE` | `storage/adapters/outbound/storage/s3-object-storage.ts` | `@aws-sdk/client-s3` + `@aws-sdk/s3-presigned-post`; rede/5xx/429 viram `ObjectStorageUnavailableError` (503) |
+| `STORAGE_METRICS` | `storage/adapters/outbound/metrics/otel-storage-metrics.ts` | `bilheteria.images.*` (ver [Métricas de negócio](#métricas-de-negócio)) |
+| `EVENT_IMAGE_SERVICE` | `event/application/services/event-image.service.ts` | quem pode, limite da galeria, troca/remoção da capa e das fotos |
+| `EVENT_IMAGE_REPOSITORY` | `event/adapters/outbound/repositories/event-image.repository.ts` | transações com o evento travado |
+| avatar | `users/application/services/user.service.ts` e `users/adapters/outbound/auth/better-auth.ts` | `avatar_key` + `customSession` (`avatarUrl`) |
+
+### Variáveis do armazenamento
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `STORAGE_S3_BUCKET` | `bilheteria-images` | bucket |
+| `STORAGE_S3_REGION` | `us-east-1` | região (no R2: `auto`) |
+| `STORAGE_S3_ENDPOINT` | — | vazio = AWS S3; LocalStack: `http://localhost:4566` (o navegador também precisa alcançar esse endereço: o POST vai direto para ele) |
+| `STORAGE_S3_FORCE_PATH_STYLE` | `false` | `true` no LocalStack/MinIO (`http://host/bucket/chave`) |
+| `STORAGE_S3_ACCESS_KEY_ID` / `STORAGE_S3_SECRET_ACCESS_KEY` | — | vazias = cadeia padrão da AWS (variáveis `AWS_*`, perfil, role da máquina). LocalStack: `test` / `test` |
+| `STORAGE_PUBLIC_URL` | derivada | base das URLs servidas; sem ela: `{endpoint}/{bucket}` (path-style) ou `https://{bucket}.s3.{region}.amazonaws.com` |
+
+### Trocando para S3 de verdade (ou CloudFront, R2, MinIO)
+
+Só `.env`, nada de código:
+
+- **AWS S3**: crie o bucket, aplique o CORS (origem do front, métodos `POST`/`GET`/`HEAD`) e a política de leitura pública de `infra/storage/localstack/init-s3.sh` (ou deixe o bucket privado e sirva por CloudFront com OAC). No `.env`: `STORAGE_S3_ENDPOINT=` vazio, `STORAGE_S3_FORCE_PATH_STYLE=false`, `STORAGE_S3_REGION=<região>`, credenciais de um usuário/role com `s3:PutObject`, `s3:GetObject` e `s3:DeleteObject` no bucket (o POST pré-assinado é assinado com elas) e `STORAGE_PUBLIC_URL=https://<bucket>.s3.<região>.amazonaws.com` ou o domínio do CloudFront.
+- **Cloudflare R2**: `STORAGE_S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`, `STORAGE_S3_REGION=auto`, chaves de API do R2, CORS no bucket e `STORAGE_PUBLIC_URL` = domínio público do bucket (`r2.dev` ou domínio próprio).
+- **MinIO**: igual ao LocalStack (`STORAGE_S3_FORCE_PATH_STYLE=true` e o endpoint do MinIO).
+
+### Testes
+
+Unitários sem S3: o adapter é testado com o SDK mockado (`S3Client.prototype.send` e `createPresignedPost`), o service de imagens com a porta mockada (validação, 503, objeto inválido apagado), o `EventImageService` (autorização, limite, troca/remoção com o objeto antigo apagado) e o repositório (lock antes da contagem, posições, reordenação em duas fases). O e2e confere `cover_url`/`photos` nas respostas e que todas as rotas de imagem exigem sessão.
+
+
 ## Setup
 
 Comandos rodados dentro de `backend/`. Para subir tudo pela raiz, veja o [README do monorepo](../README.md).
@@ -325,6 +393,7 @@ Variáveis (ver `.env.example`):
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth Google |
 | `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | OAuth Facebook |
 | `MP_*` | Mercado Pago, ver [Variáveis do pagamento](#variáveis-do-pagamento) |
+| `STORAGE_*` | bucket das imagens, ver [Variáveis do armazenamento](#variáveis-do-armazenamento) |
 | `OTEL_*`, `LOG_LEVEL`, `NODE_ENV` | opcionais, ver [Observabilidade](#observabilidade) |
 
 Depois de alterar `prisma/schema.prisma`, rode `npx prisma generate --config prisma7.config.ts` (ou `migrate dev`, que já gera).
@@ -390,6 +459,10 @@ O adapter recebe o `Meter` por DI (`OTEL_METER`, exportado pelo `ObservabilityMo
 | `bilheteria_payments_checkouts_total` | counter | `outcome` | checkouts abertos: `created` (nova order) ou `reused` (idempotência) |
 | `bilheteria_payments_webhooks_rejected_total` | counter | `reason` | notificações recusadas antes de processar: `missing_secret`, `missing_signature`, `malformed_signature`, `invalid_signature`, `stale_signature` |
 | `bilheteria_events_created_total` | counter | — | eventos criados |
+| `bilheteria_images_upload_urls_total` | counter | `kind` | POSTs pré-assinados emitidos: `event_cover`, `event_photo`, `user_avatar` |
+| `bilheteria_images_uploads_confirmed_total` | counter | `kind` | uploads conferidos no bucket e válidos |
+| `bilheteria_images_uploads_rejected_total` | counter | `kind`, `reason` | confirmações recusadas: `invalid_key`, `missing`, `too_large`, `invalid_type`, `invalid_content` |
+| `bilheteria_images_delete_failures_total` | counter | `kind` | imagens substituídas/removidas que não foram apagadas do bucket (órfãs) |
 
 No código os instrumentos têm nomes OTel (`bilheteria.reservations`, `bilheteria.reservation.duration` em segundos...); o Alloy converte para os nomes acima. **Nunca** use id de usuário, evento ou ticket como label: cada valor distinto cria uma série nova no Prometheus. Ids vão em atributos de span.
 
@@ -448,6 +521,11 @@ npm run test:load    # teste de carga (API rodando)
    - [x] Confirmação idempotente e atômica (ticket pago + pagamento aprovado na mesma transação); estorno automático quando a reserva já não vale.
    - [x] `POST /webhook/ticket/payment` (público, sem assinatura) removido.
    - Depois: preço por setor/meia-entrada; endpoint para o organizador definir o preço de eventos antigos; reconciliação periódica (job que consulta orders `pending` antigas, para o caso de o webhook nunca chegar); painel e alerta de `webhooks_rejected`/`refunded` no Grafana.
+
+4. **Imagens no S3** — feito (ver [Armazenamento de imagens](#armazenamento-de-imagens)):
+   - [x] Capa e galeria (até 10, reordenável) do evento; avatar do usuário com fallback para a foto do Google.
+   - [x] Upload direto do navegador com POST pré-assinado (tamanho/tipo garantidos pelo S3) e confirmação conferindo o objeto.
+   - Depois: miniaturas/redimensionamento (ex.: worker na confirmação), limpeza de uploads nunca confirmados, `next/image` com `remotePatterns` vindo do `.env` e persistência do S3 local em dev.
 
 ### Pendências encontradas pelos testes
 - `GET /status/:id`: `reserved` inclui ingressos pagos (`total - available`).

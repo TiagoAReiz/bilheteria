@@ -1,6 +1,6 @@
 # Bilheteria
 
-Venda de ingressos com reserva concorrente, pagamento pelo Mercado Pago (Checkout Pro), login social (Google e Facebook) e limite de ingressos por CPF.
+Venda de ingressos com reserva concorrente, pagamento pelo Mercado Pago (Checkout Pro), login social (Google e Facebook), limite de ingressos por CPF e imagens (capa/galeria dos eventos e avatar) num bucket S3.
 
 | App | Stack | Porta | Docs |
 | --- | --- | --- | --- |
@@ -11,10 +11,10 @@ Venda de ingressos com reserva concorrente, pagamento pelo Mercado Pago (Checkou
 
 ```
 bilheteria/
-├── backend/              # API: módulos users, event, ticket, payment em arquitetura hexagonal
+├── backend/              # API: módulos users, event, ticket, payment, storage em arquitetura hexagonal
 ├── frontend/             # app web: rotas (public)/(private), modules/ por página, shared/
-├── infra/                # observabilidade (Alloy, Prometheus, Loki, Tempo, Grafana), busca e túnel do pagamento
-├── docker-compose.yaml   # infraestrutura compartilhada: Postgres + observabilidade
+├── infra/                # observabilidade (Alloy, Prometheus, Loki, Tempo, Grafana), busca, túnel do pagamento e S3 (LocalStack)
+├── docker-compose.yaml   # infraestrutura compartilhada: Postgres + observabilidade (+ includes de infra/)
 └── package.json          # atalhos para rodar os dois apps a partir da raiz
 ```
 
@@ -26,7 +26,7 @@ Cada app é independente: tem o próprio `package.json`, lockfile, `.env` e test
 npm run install:all          # instala backend e frontend
 cp backend/.env.example backend/.env       # preencher (ver backend/README.md)
 cp frontend/.env.example frontend/.env.local
-npm run infra:up             # Postgres + stack de observabilidade
+npm run infra:up             # Postgres, observabilidade, busca e S3 (LocalStack)
 cd backend && npx prisma migrate dev --config prisma7.config.ts && cd ..
 npm run dev:backend          # http://localhost:3000
 npm run dev:frontend         # http://localhost:3001 (em outro terminal)
@@ -37,7 +37,7 @@ npm run dev:frontend         # http://localhost:3001 (em outro terminal)
 | Script | O que faz |
 | --- | --- |
 | `npm run install:all` | `npm ci` nos dois apps |
-| `npm run infra:up` / `infra:down` | sobe/derruba o `docker-compose.yaml` |
+| `npm run infra:up` / `infra:down` | sobe/derruba o `docker-compose.yaml` (com os `include` de busca, pagamento e storage) |
 | `npm run dev:backend` / `dev:frontend` | sobe cada app em modo dev |
 | `npm run build` | build dos dois |
 | `npm run lint` | lint dos dois |
@@ -219,6 +219,31 @@ Observações:
 - A documentação do Mercado Pago avisa que pagamentos feitos com credenciais de teste podem não disparar notificações; se a tela ficar em "Aguardando a confirmação", valide o webhook com o "Simular notificação".
 - Métricas: `bilheteria_payments_{confirmed,rejected,refunded,not_approved,checkouts,webhooks_rejected}_total` no Prometheus (ver [backend/README.md#métricas-de-negócio](backend/README.md#métricas-de-negócio)).
 
+## Armazenamento de imagens (S3 / LocalStack)
+
+Capa e galeria (até 10 fotos) dos eventos e o avatar dos usuários ficam num bucket S3. O arquivo **não passa pela API**: o navegador envia direto ao bucket com um POST pré-assinado e a API só assina e confere. Detalhes, endpoints e regras: [backend/README.md#armazenamento-de-imagens](backend/README.md#armazenamento-de-imagens).
+
+```
+front ──POST /events/:id/cover/upload-url──► API (dono do evento? tipo ok?) ──► { url, fields, key }
+  │                                           assina: chave gerada no servidor, Content-Type exato, até 5 MB
+  └──POST multipart (fields + arquivo)──► bucket (LocalStack :4566)   o S3 recusa tamanho/tipo/chave fora da política
+front ──PUT /events/:id/cover { key }──► API ──HEAD/GET 12 bytes──► bucket   confere tamanho, tipo e assinatura
+                                           └─► grava a chave no Postgres e apaga a capa anterior
+front <img src="STORAGE_PUBLIC_URL/events/1/cover/<uuid>.png">  leitura pública direto do bucket
+```
+
+Tudo fica em [`infra/storage/`](infra/storage), incluído pelo `docker-compose.yaml` da raiz:
+
+| Serviço | Imagem | Porta | Papel |
+| --- | --- | --- | --- |
+| `localstack` | `localstack/localstack:4.14.0` | 4566 | S3 emulado; o hook `localstack/init-s3.sh` (ready.d, idempotente) cria o bucket `bilheteria-images`, o CORS para `http://localhost:3001` e a política de leitura pública |
+
+- **Por que 4.14.0**: desde a 2026.03.0 a imagem do LocalStack é única e **exige `LOCALSTACK_AUTH_TOKEN`** (conta; plano Hobby gratuito só para uso não comercial). A 4.14.0 (fev/2026) é a última community que sobe sem token, e é o que está fixado. Não use `latest`/`stable`/`2026.x`. Ela não recebe mais correções; se um dia parar de servir, o MinIO (`minio/minio`) é um substituto compatível com S3 que só pede mudar as variáveis `STORAGE_*` (path-style, endpoint e credenciais) e o script de init.
+- **Sem persistência**: o LocalStack community guarda tudo em memória. Recriar o container apaga as imagens (as chaves no banco ficam apontando para nada; é só reenviar). O bucket, o CORS e a política voltam sozinhos.
+- **Conferir**: `curl localhost:4566/_localstack/init/ready` (o hook rodou?), `curl localhost:4566/bilheteria-images` (lista os objetos, XML) e abrir uma `cover_url` no navegador.
+- **Variáveis** do backend: `STORAGE_S3_*` e `STORAGE_PUBLIC_URL` (ver [backend/README.md](backend/README.md#variáveis-do-armazenamento)). Trocar para S3 de verdade, CloudFront ou R2 é só `.env`.
+- **Busca**: a capa vai para o índice `events` como `cover_key` (a URL é montada pela API). O `search-init` adiciona o campo ao índice existente (`infra/search/elasticsearch/mapping-additions/`, `PUT _mapping`, sem reindexar). Num ambiente que já existia: `docker compose run --rm search-init`, a migration (`npx prisma migrate deploy --config prisma7.config.ts`) e `docker compose restart sequin` (recarrega a transform). Eventos antigos só ganham `cover_key` no índice quando mudam (ou com o backfill do Sequin).
+
 ## Próximos passos
 
-Busca com Elasticsearch + Sequin e pagamento com Mercado Pago estão feitos. Falta o Faro no front (observabilidade do navegador) e, no pagamento, preço por setor e reconciliação periódica. Detalhes em [backend/README.md#próximos-passos](backend/README.md#próximos-passos).
+Busca com Elasticsearch + Sequin, pagamento com Mercado Pago e imagens no S3 estão feitos. Falta o Faro no front (observabilidade do navegador) e, no pagamento, preço por setor e reconciliação periódica. Detalhes em [backend/README.md#próximos-passos](backend/README.md#próximos-passos).

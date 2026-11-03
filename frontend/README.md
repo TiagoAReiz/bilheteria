@@ -1,6 +1,6 @@
 # Bilheteria — Front
 
-Front-end em Next.js (App Router) da [API Bilheteria](../bilheteria) (NestJS + Better Auth): lista eventos, mostra disponibilidade e preço, reserva e paga ingressos (Mercado Pago), cadastro de CPF, perfil de organizador e criação de eventos.
+Front-end em Next.js (App Router) da [API Bilheteria](../bilheteria) (NestJS + Better Auth): lista eventos, mostra disponibilidade e preço, reserva e paga ingressos (Mercado Pago), cadastro de CPF, foto de perfil, perfil de organizador, criação de eventos e capa/galeria dos eventos (upload direto ao S3 com URL pré-assinada; ver [backend/README.md](../backend/README.md#armazenamento-de-imagens)).
 
 **Stack:** Next.js 16 (App Router, Turbopack) · TypeScript · Tailwind CSS v4 · shadcn/ui (Radix) · axios · react-hook-form + zod · sonner (toasts) · Jest + React Testing Library.
 
@@ -48,9 +48,9 @@ src/
 │       └── payment/{success,pending,failure}/page.tsx  # retorno do Mercado Pago
 ├── modules/                     # um módulo por página/feature
 │   ├── events/                  # lista da home
-│   ├── event-detail/            # detalhe, status dos ingressos e reserva
+│   ├── event-detail/            # detalhe, status dos ingressos, reserva, capa e galeria (com edição para o dono)
 │   ├── login/                   # login social
-│   ├── profile/                 # perfil, CPF, virar organizador
+│   ├── profile/                 # perfil, foto, CPF, virar organizador
 │   ├── payment/                 # botão Pagar (checkout + contagem) e telas de retorno
 │   └── new-event/               # formulário de criação de evento
 │       ├── components/          # componentes da página
