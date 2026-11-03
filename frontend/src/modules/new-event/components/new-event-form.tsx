@@ -11,7 +11,15 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { useCreateEvent } from "../hooks/useCreateEvent";
-import { MAX_CAPACITY, newEventSchema, toCreateEventRequest, type NewEventFormValues } from "../types/new-event.schema";
+import {
+  DEFAULT_TICKETS_PER_CPF,
+  MAX_CAPACITY,
+  MAX_TICKETS_PER_CPF,
+  MIN_TICKETS_PER_CPF,
+  newEventSchema,
+  toCreateEventRequest,
+  type NewEventFormValues,
+} from "../types/new-event.schema";
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
@@ -31,7 +39,7 @@ export function NewEventForm() {
     formState: { errors },
   } = useForm<NewEventFormValues>({
     resolver: zodResolver(newEventSchema),
-    defaultValues: { name: "", description: "", location: "", starts_at: "", price: "" },
+    defaultValues: { name: "", description: "", location: "", starts_at: "", price: "", max_tickets_per_cpf: DEFAULT_TICKETS_PER_CPF },
   });
 
   async function onSubmit(values: NewEventFormValues) {
@@ -103,7 +111,8 @@ export function NewEventForm() {
             </div>
           </div>
 
-          <div className="space-y-2 sm:max-w-[calc(50%-0.5rem)]">
+          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
             <Label htmlFor="price">Preço do ingresso (R$)</Label>
             <Input
               id="price"
@@ -118,6 +127,26 @@ export function NewEventForm() {
               Preço único para todos os ingressos do evento, cobrado pelo Mercado Pago.
             </p>
             <FieldError id="price-error" message={errors.price?.message} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="max_tickets_per_cpf">Ingressos por CPF</Label>
+            <Input
+              id="max_tickets_per_cpf"
+              type="number"
+              min={MIN_TICKETS_PER_CPF}
+              max={MAX_TICKETS_PER_CPF}
+              step={1}
+              aria-invalid={!!errors.max_tickets_per_cpf || undefined}
+              aria-describedby="max_tickets_per_cpf-hint max_tickets_per_cpf-error"
+              {...register("max_tickets_per_cpf", { valueAsNumber: true })}
+            />
+            <p id="max_tickets_per_cpf-hint" className="text-sm text-muted-foreground">
+              Quantos ingressos cada pessoa (CPF) pode reservar ou comprar neste evento, de {MIN_TICKETS_PER_CPF} a{" "}
+              {MAX_TICKETS_PER_CPF}.
+            </p>
+            <FieldError id="max_tickets_per_cpf-error" message={errors.max_tickets_per_cpf?.message} />
+          </div>
           </div>
 
           <Button type="submit" disabled={loading}>

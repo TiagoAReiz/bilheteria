@@ -33,6 +33,7 @@ describe('EventRepository', () => {
       starts_at: new Date('2030-01-01T20:00:00Z'),
       capacity: 3,
       price_cents: 5000,
+      max_tickets_per_cpf: 2,
       organizer_id: 'org-1',
     } satisfies NewEvent;
 
@@ -52,6 +53,7 @@ describe('EventRepository', () => {
           starts_at: newEvent.starts_at,
           capacity: 3,
           price_cents: 5000,
+          max_tickets_per_cpf: 2,
           available_tickets: 3,
           organizer_id: 'org-1',
           tickets: {
@@ -98,6 +100,7 @@ describe('EventRepository', () => {
           'capacity',
           'description',
           'location',
+          'max_tickets_per_cpf',
           'name',
           'organizer_id',
           'price_cents',

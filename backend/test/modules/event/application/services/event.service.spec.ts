@@ -23,6 +23,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   starts_at: new Date('2030-01-01T20:00:00Z'),
   capacity: 10,
   price_cents: 5000,
+  max_tickets_per_cpf: 2,
   available_tickets: 10,
   cover_key: null,
   organizer_id: 'org-1',
@@ -69,6 +70,7 @@ describe('EventService', () => {
       starts_at: new Date('2030-01-01T20:00:00Z'),
       capacity: 10,
       price_cents: 5000,
+      max_tickets_per_cpf: 2,
       organizer_id: 'org-1',
     };
     const created = makeEvent();
@@ -90,6 +92,7 @@ describe('EventService', () => {
         starts_at: new Date('2030-01-01T20:00:00Z'),
         capacity: 10,
         price_cents: 5000,
+        max_tickets_per_cpf: 2,
         organizer_id: 'org-1',
       }),
     ).rejects.toThrow('db');

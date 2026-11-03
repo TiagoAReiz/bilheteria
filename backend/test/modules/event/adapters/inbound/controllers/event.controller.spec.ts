@@ -26,6 +26,7 @@ const event: EventView = {
   starts_at: new Date('2030-01-01T20:00:00Z'),
   capacity: 10,
   price_cents: 5000,
+  max_tickets_per_cpf: 2,
   available_tickets: 10,
   cover_url: null,
   organizer_id: 'org-1',
@@ -71,6 +72,7 @@ describe('EventController', () => {
         starts_at,
         capacity: 10,
         price_cents: 5000,
+        max_tickets_per_cpf: 2,
         // campos que o cliente nao pode definir
         organizer_id: 'hacker',
         id: 999,
@@ -86,6 +88,7 @@ describe('EventController', () => {
         starts_at,
         capacity: 10,
         price_cents: 5000,
+        max_tickets_per_cpf: 2,
         organizer_id: 'org-1',
       });
     });

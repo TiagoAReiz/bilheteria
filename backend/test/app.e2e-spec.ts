@@ -56,6 +56,7 @@ const upcoming = {
   starts_at: new Date('2099-01-01T20:00:00.000Z'),
   capacity: 10,
   price_cents: 5000,
+  max_tickets_per_cpf: 2,
   available_tickets: 10,
   cover_key: 'events/1/cover/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png',
   organizer_id: 'org-1',

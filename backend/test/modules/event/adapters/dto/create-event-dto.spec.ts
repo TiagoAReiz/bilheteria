@@ -13,6 +13,7 @@ const validBody = () => ({
   starts_at: '2026-07-01T20:00:00.000Z',
   capacity: 100,
   price_cents: 5000,
+  max_tickets_per_cpf: 2,
 });
 
 async function errorsFor(body: Record<string, unknown>) {
@@ -98,7 +99,7 @@ describe('CreateEventDto', () => {
 
   describe('capacity', () => {
     it.each([1, 100000])('aceita o limite %d', async (capacity) => {
-      await expect(errorsFor({ ...validBody(), capacity })).resolves.toEqual(
+      await expect(errorsFor({ ...validBody(), capacity, max_tickets_per_cpf: 1 })).resolves.toEqual(
         {},
       );
     });
@@ -143,6 +144,32 @@ describe('CreateEventDto', () => {
     it.each(['5000', '50,00', null])('rejeita %j', async (price_cents) => {
       const errors = await errorsFor({ ...validBody(), price_cents });
       expect(errors.price_cents).toContain('isInt');
+    });
+  });
+
+  describe('max_tickets_per_cpf', () => {
+    it('é obrigatório', async () => {
+      const { max_tickets_per_cpf, ...body } = validBody();
+      expect(await errorsFor(body)).toHaveProperty('max_tickets_per_cpf');
+    });
+
+    it.each([0, 11, 1.5, '2'])('recusa %p', async (value) => {
+      expect(await errorsFor({ ...validBody(), max_tickets_per_cpf: value })).toHaveProperty(
+        'max_tickets_per_cpf',
+      );
+    });
+
+    it.each([1, 10])('aceita %p', async (value) => {
+      expect(await errorsFor({ ...validBody(), max_tickets_per_cpf: value })).toEqual({});
+    });
+
+    it('não pode passar da capacidade', async () => {
+      expect(
+        await errorsFor({ ...validBody(), capacity: 3, max_tickets_per_cpf: 4 }),
+      ).toEqual({ max_tickets_per_cpf: ['notAboveCapacity'] });
+      expect(
+        await errorsFor({ ...validBody(), capacity: 3, max_tickets_per_cpf: 3 }),
+      ).toEqual({});
     });
   });
 });

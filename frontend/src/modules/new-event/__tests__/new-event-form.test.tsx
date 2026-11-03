@@ -50,9 +50,36 @@ describe("<NewEventForm />", () => {
       capacity: 500,
       // reais digitados viram centavos inteiros
       price_cents: 8990,
+      // padrão do formulário
+      max_tickets_per_cpf: 2,
     });
     expect(toast.success).toHaveBeenCalledWith("Evento criado com sucesso!");
     expect(push).toHaveBeenCalledWith("/events/33");
+  });
+
+  it("envia o limite por CPF escolhido pelo organizador", async () => {
+    create.mockResolvedValue(makeEvent({ id: 34 }));
+    render(<NewEventForm />);
+    await fillValid();
+    const limit = screen.getByLabelText("Ingressos por CPF");
+    expect(limit).toHaveValue(2);
+    await userEvent.clear(limit);
+    await userEvent.type(limit, "4");
+    await userEvent.click(screen.getByRole("button", { name: "Criar evento" }));
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ max_tickets_per_cpf: 4 }));
+  });
+
+  it("limite por CPF acima de 10 mostra erro e não chama a API", async () => {
+    render(<NewEventForm />);
+    await fillValid();
+    const limit = screen.getByLabelText("Ingressos por CPF");
+    await userEvent.clear(limit);
+    await userEvent.type(limit, "11");
+    await userEvent.click(screen.getByRole("button", { name: "Criar evento" }));
+
+    expect(await screen.findByText("O limite máximo é 10")).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("preço inválido mostra o erro no campo e não chama a API", async () => {

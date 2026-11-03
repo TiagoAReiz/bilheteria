@@ -41,6 +41,9 @@ model event{
     // preço único do ingresso, em centavos de BRL (CHECK > 0 na migration). Nulo só nos eventos
     // criados antes do pagamento: ficam sem venda até ganharem um preço (o checkout recusa).
     price_cents Int?
+    // quantos ingressos ativos (pagos ou com reserva vigente) um mesmo CPF pode ter neste evento;
+    // escolhido pelo organizador na criação (1..10, CHECK na migration). Eventos antigos ficam com 2.
+    max_tickets_per_cpf Int @default(2)
     // contador aproximado para a busca: recalculado em lote pelo job de disponibilidade
     // (o numero exato continua vindo do /status/:id, que conta os tickets)
     available_tickets Int @default(0)

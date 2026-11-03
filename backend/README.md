@@ -119,12 +119,13 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 - Ao criar, os `capacity` ingressos do evento são gerados na mesma transação.
 - Listagem mostra só eventos futuros e não excluídos (`deleted_at`).
 - `price_cents`: preço único do ingresso em centavos de BRL, obrigatório, inteiro de 100 (R$ 1,00) a 10.000.000 (R$ 100.000,00). Eventos anteriores ao pagamento têm `null` (sem venda; ver [payment](#payment)).
+- `max_tickets_per_cpf`: quantos ingressos ativos um mesmo CPF pode ter no evento, obrigatório, inteiro de 1 a 10 e no máximo `capacity` (CHECK `event_max_tickets_per_cpf_range` no banco).
 
 - **Imagens**: uma capa (`event.cover_key`) e uma galeria de até 10 fotos (`event_photo`, ordenadas por `position`). Só o organizador que criou o evento ou um `ADMIN` mexem (403 para os demais, 404 para evento inexistente/excluído). As respostas trazem `cover_url` (e `photos` no detalhe), nunca a chave. Fluxo e regras em [Armazenamento de imagens](#armazenamento-de-imagens).
 
 | Método | Rota | Auth | Descrição |
 | --- | --- | --- | --- |
-| POST | `/events` | `ORGANIZER`/`ADMIN` | `{ name, description?, location, starts_at, capacity, price_cents }` |
+| POST | `/events` | `ORGANIZER`/`ADMIN` | `{ name, description?, location, starts_at, capacity, price_cents, max_tickets_per_cpf }` |
 | GET | `/events` | não | próximos eventos (com `cover_url`) |
 | GET | `/events/:id` | não | detalhe do evento com `cover_url` e `photos: [{ id, url, position }]` em ordem |
 | POST | `/events/:id/cover/upload-url` | dono/`ADMIN` | `{ content_type }` → POST pré-assinado |
@@ -139,7 +140,7 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 
 - Ticket pertence a um evento (`ticket.event_id`) e a um usuário (`ticket.user_id`).
 - Reserva exige CPF cadastrado e evento que ainda não começou.
-- **Limite de 2 ingressos por usuário por evento** (como o CPF é único por conta, equivale a 2 por CPF). Contam ingressos pagos e reservas ainda válidas; reserva expirada não conta.
+- **Limite de ingressos por CPF definido pelo organizador** (`max_tickets_per_cpf`, 1 a 10 e no máximo a capacidade; obrigatório no `POST /events`; eventos anteriores ficaram com 2). Como o CPF é único por conta, o limite é por usuário. Contam ingressos pagos e reservas ainda válidas; reserva expirada não conta. Sem CPF a reserva responde 403 e o front abre um modal para cadastrar o CPF e continua a reserva.
 - O limite é garantido em uma transação que trava a linha do usuário (`SELECT ... FOR UPDATE`), então requisições simultâneas do mesmo usuário não furam o limite. A escolha do ingresso usa `FOR UPDATE SKIP LOCKED` para usuários diferentes não disputarem a mesma linha.
 - Reserva expira em 5 minutos sem pagamento; depois disso o ingresso volta a ficar disponível.
 - Constantes da regra em `ticket/core/entities/reservation.entity.ts`.

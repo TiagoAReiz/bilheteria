@@ -8,6 +8,8 @@ export interface EventResponse {
   capacity: number;
   /** Preço único do ingresso em centavos (BRL). null: evento antigo, sem venda. */
   price_cents: number | null;
+  /** Quantos ingressos ativos (pagos ou reservados) um mesmo CPF pode ter neste evento. */
+  max_tickets_per_cpf: number;
   /** URL pública da capa (null: sem capa). */
   cover_url: string | null;
   organizer_id: string;

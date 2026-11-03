@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, BanknoteIcon, CalendarIcon, MapPinIcon, UsersIcon } from "lucide-react";
+import { ArrowLeftIcon, BanknoteIcon, CalendarIcon, MapPinIcon, TicketIcon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
@@ -139,6 +139,10 @@ function EventDetailContent({
                   Ingresso: <strong className="text-foreground">{formatBRL(event.price_cents)}</strong>
                 </span>
               )}
+            </p>
+            <p className="flex items-center gap-2">
+              <TicketIcon className="size-4" aria-hidden />
+              Limite de {event.max_tickets_per_cpf} {event.max_tickets_per_cpf === 1 ? "ingresso" : "ingressos"} por CPF
             </p>
           </div>
         </CardHeader>

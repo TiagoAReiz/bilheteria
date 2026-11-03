@@ -6,8 +6,13 @@ export const MAX_CAPACITY = 100000;
 /** Mesmos limites do backend (centavos): R$ 1,00 a R$ 100.000,00. */
 export const MIN_PRICE_CENTS = 100;
 export const MAX_PRICE_CENTS = 10_000_000;
+/** Mesmos limites do backend: ingressos ativos por CPF no evento. */
+export const MIN_TICKETS_PER_CPF = 1;
+export const MAX_TICKETS_PER_CPF = 10;
+export const DEFAULT_TICKETS_PER_CPF = 2;
 
-export const newEventSchema = z.object({
+export const newEventSchema = z
+  .object({
   name: z.string().trim().min(1, "Informe o nome do evento"),
   description: z.string().trim().optional(),
   location: z.string().trim().min(1, "Informe o local"),
@@ -30,7 +35,18 @@ export const newEventSchema = z.object({
       const message = priceError(value);
       if (message) ctx.addIssue({ code: "custom", message });
     }),
-});
+  max_tickets_per_cpf: z
+    .number({ error: "Informe o limite por CPF" })
+    .int("O limite deve ser um número inteiro")
+    .min(MIN_TICKETS_PER_CPF, `O limite mínimo é ${MIN_TICKETS_PER_CPF}`)
+    .max(MAX_TICKETS_PER_CPF, `O limite máximo é ${MAX_TICKETS_PER_CPF}`),
+  })
+  // o backend recusa limite maior que a capacidade
+  // (capacidade inválida já tem o próprio erro: não repete aqui)
+  .refine((v) => !Number.isInteger(v.capacity) || v.capacity < 1 || v.max_tickets_per_cpf <= v.capacity, {
+    path: ["max_tickets_per_cpf"],
+    message: "O limite por CPF não pode ser maior que a capacidade",
+  });
 
 function priceError(value: string): string | undefined {
   if (!value) return "Informe o preço do ingresso";
@@ -53,5 +69,6 @@ export function toCreateEventRequest(values: NewEventFormValues): CreateEventReq
     capacity: values.capacity,
     // o schema já garantiu um valor válido
     price_cents: parseReaisToCents(values.price) as number,
+    max_tickets_per_cpf: values.max_tickets_per_cpf,
   };
 }

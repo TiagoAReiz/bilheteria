@@ -1,7 +1,7 @@
 import {ConflictException, ForbiddenException, Inject, Injectable, NotFoundException} from '@nestjs/common';
 import {Status} from "../../core/entities/status.entity.js";
 import {Ticket} from "../../core/entities/ticket.entity.js";
-import {MAX_TICKETS_PER_USER_PER_EVENT, RESERVATION_TTL_MINUTES, ReservationResult} from "../../core/entities/reservation.entity.js";
+import {RESERVATION_TTL_MINUTES, ReservationResult} from "../../core/entities/reservation.entity.js";
 import {MyTicket} from "../../core/entities/my-ticket.entity.js";
 import {TicketServicePort} from "../ports/inbound/services/ticket.service.port.js";
 import {TICKET_REPOSITORY, type TicketRepositoryPort} from "../ports/outbound/repositories/ticket.repository.port.js";
@@ -57,7 +57,8 @@ export class TicketService implements TicketServicePort {
     if(event.starts_at.getTime() <= Date.now()){
       return {outcome: 'event_started'};
     }
-    return this.ticketRepository.reserveTicketWithinLimit(user_id, event_id, MAX_TICKETS_PER_USER_PER_EVENT);
+    // limite escolhido pelo organizador do evento
+    return this.ticketRepository.reserveTicketWithinLimit(user_id, event_id, event.max_tickets_per_cpf);
   }
 
   private ticketOrThrow(attempt: ReservationAttempt, event_id: number): Ticket {

@@ -26,6 +26,7 @@ export function makeEvent(overrides: Partial<EventResponse> = {}): EventResponse
     starts_at: "2099-05-10T22:00:00.000Z",
     capacity: 100,
     price_cents: 5000,
+    max_tickets_per_cpf: 2,
     cover_url: null,
     organizer_id: "org-1",
     created_at: "2026-01-01T00:00:00.000Z",

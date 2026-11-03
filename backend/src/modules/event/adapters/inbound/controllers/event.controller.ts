@@ -18,6 +18,7 @@ export class EventController {
       starts_at: dto.starts_at,
       capacity: dto.capacity,
       price_cents: dto.price_cents,
+      max_tickets_per_cpf: dto.max_tickets_per_cpf,
       organizer_id: session.user.id,
     });
   }

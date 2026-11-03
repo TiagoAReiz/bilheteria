@@ -1,15 +1,23 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2Icon, Loader2Icon, TicketIcon, TriangleAlertIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
 import { useSession } from "@/shared/hooks/useSession";
 import { buildLoginUrl } from "@/shared/lib/auth-redirect";
 import { formatTime } from "@/shared/lib/format";
 import { PayTicketButton } from "@/modules/payment/components/pay-ticket-button";
+import { CpfRegistrationForm } from "@/modules/profile/components/cpf-form";
 import { isReserveError, useReserveTicket } from "../hooks/useReserveTicket";
 import { RESERVATION_TTL_MINUTES } from "../types/event-detail.dto";
 
@@ -23,22 +31,32 @@ export function ReserveTicketButton({ eventId, disabled, onReserved }: ReserveTi
   const router = useRouter();
   const { user, status } = useSession();
   const { reserve, loading, result, error } = useReserveTicket(eventId);
+  const [cpfDialogOpen, setCpfDialogOpen] = useState(false);
   const eventPath = `/events/${eventId}`;
-  const cpfPath = `/profile?redirect=${encodeURIComponent(eventPath)}`;
+
+  async function attemptReservation() {
+    const outcome = await reserve();
+    if (isReserveError(outcome)) {
+      // sem CPF a reserva não sai: pede o CPF ali mesmo e tenta de novo depois do cadastro
+      if (outcome.kind === "cpf_required") setCpfDialogOpen(true);
+      else toast.error(outcome.message);
+      return;
+    }
+    toast.success("Ingresso reservado!");
+    onReserved?.();
+  }
 
   async function handleClick() {
     if (!user) {
       router.push(buildLoginUrl(eventPath));
       return;
     }
-    const outcome = await reserve();
-    if (isReserveError(outcome)) {
-      toast.error(outcome.message);
-      if (outcome.kind === "cpf_required") router.push(cpfPath);
-      return;
-    }
-    toast.success("Ingresso reservado!");
-    onReserved?.();
+    await attemptReservation();
+  }
+
+  async function handleCpfRegistered() {
+    setCpfDialogOpen(false);
+    await attemptReservation();
   }
 
   return (
@@ -75,13 +93,26 @@ export function ReserveTicketButton({ eventId, disabled, onReserved }: ReserveTi
           <AlertDescription>
             <p>{error.message}</p>
             {error.kind === "cpf_required" ? (
-              <Link href={cpfPath} className="font-medium underline underline-offset-4">
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => setCpfDialogOpen(true)}>
                 Cadastrar CPF
-              </Link>
+              </Button>
             ) : null}
           </AlertDescription>
         </Alert>
       ) : null}
+
+      <Dialog open={cpfDialogOpen} onOpenChange={setCpfDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cadastre seu CPF para reservar</DialogTitle>
+            <DialogDescription>
+              O CPF é obrigatório para reservar ingressos e limita quantos ingressos cada pessoa pode ter neste evento.
+              Ele é cadastrado uma única vez e não pode ser alterado depois. Assim que cadastrar, sua reserva continua.
+            </DialogDescription>
+          </DialogHeader>
+          <CpfRegistrationForm onRegistered={() => void handleCpfRegistered()} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

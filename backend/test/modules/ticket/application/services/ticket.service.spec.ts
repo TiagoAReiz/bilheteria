@@ -27,7 +27,6 @@ import {
   type ActiveSpan,
   type TracingPort,
 } from '../../../../../src/modules/observability/application/ports/outbound/tracing/tracing.port.js';
-import { MAX_TICKETS_PER_USER_PER_EVENT } from '../../../../../src/modules/ticket/core/entities/reservation.entity.js';
 import type { Ticket } from '../../../../../src/modules/ticket/core/entities/ticket.entity.js';
 import type { Event } from '../../../../../src/modules/event/core/entities/event.entity.js';
 
@@ -41,6 +40,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   starts_at: new Date(NOW.getTime() + 24 * 60 * 60 * 1000),
   capacity: 100,
   price_cents: 5000,
+  max_tickets_per_cpf: 2,
   available_tickets: 100,
   cover_key: null,
   organizer_id: 'org-1',
@@ -167,7 +167,8 @@ describe('TicketService', () => {
       );
     });
 
-    it('retorna o ticket quando o repositório reserva e usa MAX_TICKETS_PER_USER_PER_EVENT', async () => {
+    it('retorna o ticket quando o repositório reserva e usa o limite por CPF do evento', async () => {
+      eventService.getEventById.mockResolvedValue(makeEvent({ max_tickets_per_cpf: 4 }));
       const ticket = makeTicket();
       ticketRepository.reserveTicketWithinLimit.mockResolvedValue({
         outcome: 'reserved',
@@ -179,9 +180,8 @@ describe('TicketService', () => {
       expect(ticketRepository.reserveTicketWithinLimit).toHaveBeenCalledWith(
         'user-1',
         10,
-        MAX_TICKETS_PER_USER_PER_EVENT,
+        4,
       );
-      expect(MAX_TICKETS_PER_USER_PER_EVENT).toBe(2);
     });
 
     it('lança Conflict de limite quando o repositório retorna limit_reached', async () => {

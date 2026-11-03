@@ -1,19 +1,22 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
-import { makeUser, nestError, sessionValue } from "@test/helpers";
+import { makeUser, nestError, sessionValue, VALID_CPF } from "@test/helpers";
 import { useSession } from "@/shared/hooks/useSession";
 import { ReserveTicketButton } from "../components/reserve-ticket-button";
 import { eventDetailService } from "../services/event-detail.service";
+import { profileService } from "@/modules/profile/services/profile.service";
 
 const push = jest.fn();
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: jest.fn() }) }));
 jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
 jest.mock("@/shared/hooks/useSession", () => ({ useSession: jest.fn() }));
 jest.mock("../services/event-detail.service", () => ({ eventDetailService: { reserveTicket: jest.fn() } }));
+jest.mock("@/modules/profile/services/profile.service", () => ({ profileService: { registerCpf: jest.fn() } }));
 
 const mockedUseSession = jest.mocked(useSession);
 const reserveTicket = jest.mocked(eventDetailService.reserveTicket);
+const registerCpf = jest.mocked(profileService.registerCpf);
 
 function setup(props: Partial<React.ComponentProps<typeof ReserveTicketButton>> = {}) {
   const onReserved = jest.fn();
@@ -73,18 +76,54 @@ describe("<ReserveTicketButton />", () => {
     expect(screen.getByTestId("payment-countdown")).toHaveTextContent(/^0[45]:\d{2}$/);
   });
 
-  it("403: avisa e leva para cadastrar o CPF", async () => {
-    reserveTicket.mockRejectedValue(nestError(403, "Cadastre seu CPF antes de reservar ingressos", "Forbidden"));
-    const { button } = setup();
-    await userEvent.click(button);
+  describe("sem CPF (403)", () => {
+    const noCpf = () => nestError(403, "Cadastre seu CPF antes de reservar ingressos", "Forbidden");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Cadastre seu CPF antes de reservar ingressos");
-    expect(toast.error).toHaveBeenCalledWith("Cadastre seu CPF antes de reservar ingressos");
-    expect(push).toHaveBeenCalledWith("/profile?redirect=%2Fevents%2F4");
-    expect(screen.getByRole("link", { name: "Cadastrar CPF" })).toHaveAttribute(
-      "href",
-      "/profile?redirect=%2Fevents%2F4",
-    );
+    it("abre o modal de CPF sem sair da página", async () => {
+      reserveTicket.mockRejectedValue(noCpf());
+      const { button } = setup();
+      await userEvent.click(button);
+
+      expect(await screen.findByRole("dialog", { name: "Cadastre seu CPF para reservar" })).toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("cadastra o CPF no modal e conclui a reserva", async () => {
+      reserveTicket.mockRejectedValueOnce(noCpf()).mockResolvedValueOnce({
+        id: 7,
+        user_id: "u1",
+        reserved_at: new Date().toISOString(),
+        is_paid: false,
+        event_id: 4,
+      });
+      registerCpf.mockResolvedValue();
+      const { button, onReserved } = setup();
+      await userEvent.click(button);
+
+      const dialog = await screen.findByRole("dialog");
+      await userEvent.type(within(dialog).getByLabelText("CPF"), VALID_CPF);
+      await userEvent.click(within(dialog).getByRole("button", { name: /cadastrar cpf/i }));
+
+      expect(registerCpf).toHaveBeenCalledWith(VALID_CPF);
+      expect(await screen.findByText("Reserva #7 confirmada")).toBeInTheDocument();
+      expect(reserveTicket).toHaveBeenCalledTimes(2);
+      expect(onReserved).toHaveBeenCalled();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("fechar o modal deixa o aviso com o botão para reabrir", async () => {
+      reserveTicket.mockRejectedValue(noCpf());
+      const { button } = setup();
+      await userEvent.click(button);
+      await screen.findByRole("dialog");
+      await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("Cadastre seu CPF antes de reservar ingressos");
+      await userEvent.click(screen.getByRole("button", { name: "Cadastrar CPF" }));
+      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    });
   });
 
   it("409: mostra a mensagem do backend (limite/esgotado) sem redirecionar", async () => {

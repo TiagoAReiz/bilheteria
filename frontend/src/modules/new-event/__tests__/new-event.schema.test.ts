@@ -7,6 +7,7 @@ const valid = {
   starts_at: "2099-06-01T20:00",
   capacity: 100,
   price: "50,00",
+  max_tickets_per_cpf: 2,
 };
 
 function issues(values: unknown) {
@@ -63,6 +64,27 @@ describe("newEventSchema", () => {
       starts_at: new Date("2099-06-01T20:00").toISOString(),
       capacity: 100,
       price_cents: 5000,
+      max_tickets_per_cpf: 2,
     });
+  });
+
+  it.each([
+    [0, "max_tickets_per_cpf: O limite mínimo é 1"],
+    [11, "max_tickets_per_cpf: O limite máximo é 10"],
+    [1.5, "max_tickets_per_cpf: O limite deve ser um número inteiro"],
+    [Number.NaN, "max_tickets_per_cpf: Informe o limite por CPF"],
+  ])("valida limite por CPF %p", (max_tickets_per_cpf, msg) => {
+    expect(issues({ ...valid, max_tickets_per_cpf })).toEqual([msg]);
+  });
+
+  it.each([1, 10])("aceita limite por CPF %p", (max_tickets_per_cpf) => {
+    expect(issues({ ...valid, max_tickets_per_cpf })).toEqual([]);
+  });
+
+  it("limite por CPF não pode passar da capacidade", () => {
+    expect(issues({ ...valid, capacity: 3, max_tickets_per_cpf: 4 })).toEqual([
+      "max_tickets_per_cpf: O limite por CPF não pode ser maior que a capacidade",
+    ]);
+    expect(issues({ ...valid, capacity: 3, max_tickets_per_cpf: 3 })).toEqual([]);
   });
 });
