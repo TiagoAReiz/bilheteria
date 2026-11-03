@@ -134,6 +134,73 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 
 Dependências entre módulos: `ticket` usa as portas inbound de `users` (`USER_SERVICE`) e `event` (`EVENT_SERVICE`).
 
+## Busca (Elasticsearch)
+
+O índice é alimentado por CDC (Sequin lendo o WAL do Postgres; infra e operação no [README da raiz](../README.md#busca-elasticsearch--sequin)). A API só **lê** do Elasticsearch; ela nunca escreve no índice. Reserva, limite por usuário, pagamento e `GET /status/:id` continuam 100% no Postgres.
+
+### Peças no código
+
+```
+src/modules/
+├── search/                                   # infraestrutura compartilhada (papel do PrismaModule para o ES)
+│   ├── search.module.ts                      # provider ELASTICSEARCH_CLIENT (fecha o client no shutdown)
+│   ├── elasticsearch.client.ts               # Client do @elastic/elasticsearch 8.x (não conecta no construtor)
+│   ├── search-indices.ts                     # aliases lidos pela API: events, tickets
+│   ├── search-availability.ts                # falha de infraestrutura do ES -> 503
+│   └── query-transformers.ts                 # @Transform de query string (trim, "true"/"false")
+├── event/
+│   ├── core/entities/event-search.entity.ts              # critérios, resultado, limites (página, q, sugestões)
+│   ├── application/ports/inbound/services/event-search.service.port.ts        # EVENT_SEARCH_SERVICE
+│   ├── application/ports/inbound/services/event-availability.service.port.ts  # EVENT_AVAILABILITY_SERVICE
+│   ├── application/ports/outbound/search/event-search.port.ts                 # EVENT_SEARCH
+│   ├── application/services/event-search.service.ts | event-availability.service.ts
+│   ├── adapters/outbound/search/elasticsearch-event-search.ts   # monta as queries do ES
+│   ├── adapters/inbound/controllers/event-search.controller.ts  # /events/search, /events/suggest
+│   └── adapters/inbound/schedulers/available-tickets.scheduler.ts  # job de disponibilidade
+└── ticket/
+    ├── core/entities/ticket-search.entity.ts             # status available|reserved|paid|expired
+    ├── application/ports/{inbound,outbound}/...          # TICKET_SEARCH_SERVICE, TICKET_SEARCH
+    ├── application/services/ticket-search.service.ts     # escopo ADMIN x ORGANIZER
+    └── adapters/{dto,inbound/controllers,outbound/search}/...
+```
+
+Mesmas regras de dependência do resto: o service conhece só a porta `EVENT_SEARCH`/`TICKET_SEARCH`; o `@elastic/elasticsearch` aparece apenas nos adapters e no módulo `search`. O `EventSearchController` é registrado **antes** do `EventController` (ordem em `event.module.ts`), senão `/events/search` cairia em `/events/:id`; o e2e cobre isso.
+
+### Endpoints
+
+| Método | Rota | Auth | Descrição |
+| --- | --- | --- | --- |
+| GET | `/events/search?q=&location=&from=&to=&available=true&page=&size=` | não | busca textual + filtros; `{ items, total, page, size, facets: { locations: [{ value, count }] } }` |
+| GET | `/events/suggest?q=` | não | autocomplete, até 8 `{ id, name, location, starts_at }` |
+| GET | `/tickets/search?event_id=&status=&page=&size=` | `ADMIN`/`ORGANIZER` | ingressos: `{ items: [{ id, event_id, user_id, status, reserved_at, is_paid }], total, page, size }` |
+
+- **`/events/search`**: `multi_match` com `fuzziness: AUTO` em `name^3`, `name_stemmed^3`, `location^2`, `description` (analisador pt-BR: minúsculas, sem acento, stemming); sem `q`, ordena por data. Sempre só eventos futuros e não excluídos. `location` é o valor exato de uma faceta (filtro como `post_filter`, para a faceta continuar mostrando os outros locais). `available=true` filtra `available_tickets > 0`. `q`/`location` até 100 caracteres; `page` 1–200; `size` 1–50 (padrão 12). `from > to` é 400.
+- **`/events/suggest`**: `bool_prefix` no campo `search_as_you_type` (`name`, `name._2gram`, `name._3gram`), com os mesmos filtros de visibilidade.
+- **`/tickets/search`**: `ADMIN` vê tudo. `ORGANIZER` só vê ingressos dos próprios eventos: os ids vêm do **Postgres** (`EventServicePort.getEventIdsByOrganizer`), não do índice; pedir `event_id` de outro organizador é 403; sem eventos, volta vazio sem consultar o ES. `status`: `available` (nunca reservado), `reserved` (reserva dentro dos 5 min), `paid`, `expired` (reserva vencida, ingresso voltou a ficar à venda). `expired` é derivado na leitura, porque uma reserva vence sem nenhuma escrita no Postgres (portanto sem evento de CDC). `size` 1–100 (padrão 20).
+- **ES fora do ar** (conexão recusada, timeout, 5xx, 429 ou índice inexistente): 503 `A busca está temporariamente indisponível. Tente novamente em instantes.` Erro de requisição (400) segue como 500, porque é bug. A API sobe normalmente sem ES.
+
+### Job de disponibilidade (`event.available_tickets`)
+
+O índice não recebe uma mensagem a cada reserva: isso geraria um UPDATE em `event` por reserva e uma tempestade de reindexações. Em vez disso:
+
+- `event.available_tickets` (migration `20261102120100_event_available_tickets`) é um contador **aproximado**. Ele nasce igual a `capacity` no `POST /events`.
+- `AvailableTicketsScheduler` (adapter inbound acionado pelo relógio, `@nestjs/schedule`) chama `EventAvailabilityService.refreshAvailableTickets()` a cada `AVAILABILITY_REFRESH_INTERVAL_MS`. O service chama `EventRepositoryPort.refreshAvailableTickets(RESERVATION_TTL_MINUTES)`, que faz **um único UPDATE em lote**: conta os disponíveis com o mesmo critério da reserva e do `/status/:id` (não pago e nunca reservado ou reserva expirada), considera só eventos futuros e não excluídos, e **só grava onde o número mudou** (`available_tickets <> c.available`). Cada linha alterada vira uma mensagem de CDC e o Sequin reindexa só aquele evento.
+- Rodadas não se sobrepõem (se uma demorar mais que o intervalo, a próxima é pulada) e uma falha só gera log.
+- Reservas que **expiram** também mudam a contagem sem nenhuma escrita em `ticket`: o job percebe na rodada seguinte.
+- `/status/:id` continua contando os tickets no Postgres: é ele que mostra o número exato.
+
+### Variáveis novas
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `ELASTICSEARCH_URL` | `http://localhost:9200` | nó do Elasticsearch (client 8.x, mesma major do servidor) |
+| `ELASTICSEARCH_REQUEST_TIMEOUT_MS` | `2000` | timeout por requisição; estourou, a busca responde 503 |
+| `AVAILABILITY_REFRESH_INTERVAL_MS` | `10000` | intervalo do job de disponibilidade; `0` desliga; valor inválido impede a API de subir |
+
+### Testes
+
+Todos os testes rodam sem Elasticsearch: o client é mockado e os testes conferem a query montada (`test/modules/*/adapters/outbound/search/`). Também cobrem o 503 por tipo de falha, os DTOs (conversão da query string e limites), o escopo ADMIN/ORGANIZER, o job (intervalo, desligado, sem sobreposição, só atualiza o que mudou) e o contrato mapping ↔ transform ↔ adapter (`test/modules/search/index-contract.spec.ts`). O e2e sobe o app com o ES numa porta fechada e confere o 503, a ordem das rotas e que o resto da API continua respondendo.
+
 ## Setup
 
 Comandos rodados dentro de `backend/`. Para subir tudo pela raiz, veja o [README do monorepo](../README.md).

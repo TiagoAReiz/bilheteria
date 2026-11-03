@@ -19,4 +19,8 @@ export class EventService implements EventServicePort {
   async getEventById(id: number): Promise<Event> {
     return this.eventRepository.getEventById(id);
   }
+
+  async getEventIdsByOrganizer(organizerId: string): Promise<number[]> {
+    return this.eventRepository.getEventIdsByOrganizer(organizerId);
+  }
 }

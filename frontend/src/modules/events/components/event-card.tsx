@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { CalendarIcon, MapPinIcon } from "lucide-react";
+import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { formatDateTime } from "@/shared/lib/format";
 import type { EventResponse } from "@/shared/types/event";
 
-export function EventCard({ event }: { event: EventResponse }) {
+/** O que o card precisa: serve tanto para GET /events quanto para os itens da busca. */
+export type EventCardData = Pick<EventResponse, "id" | "name" | "description" | "location" | "starts_at"> & {
+  /** Só a busca informa (contador aproximado); sem ele o card não mostra disponibilidade. */
+  available_tickets?: number;
+};
+
+export function EventCard({ event }: { event: EventCardData }) {
   return (
     <Card className="flex h-full flex-col">
       <CardHeader>
@@ -21,6 +28,11 @@ export function EventCard({ event }: { event: EventResponse }) {
           <CalendarIcon className="size-4 shrink-0" aria-hidden />
           <time dateTime={event.starts_at}>{formatDateTime(event.starts_at)}</time>
         </p>
+        {event.available_tickets === undefined ? null : event.available_tickets > 0 ? (
+          <Badge variant="secondary">Ingressos disponíveis</Badge>
+        ) : (
+          <Badge variant="destructive">Esgotado</Badge>
+        )}
       </CardContent>
       <CardFooter>
         <Button asChild className="w-full">

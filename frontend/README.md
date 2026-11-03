@@ -84,6 +84,17 @@ npx shadcn@latest add dialog
 
 > Importante: a versão 4.x do CLI às vezes escreve `import { cn } from "cn"` (um pacote npm). Depois de rodar `add`, troque para `@/shared/lib/utils`.
 
+## Busca na home
+
+A home (`/`) tem uma barra de busca (`modules/events/components/event-search-bar.tsx`) sobre a lista:
+
+- **Autocomplete** (`event-search-input.tsx` + `hooks/useEventSuggestions.ts`): combobox acessível (setas, Enter, Esc) que chama `GET /events/suggest` depois de 250 ms sem digitação e a partir de 2 caracteres, cancelando a requisição anterior. Escolher uma sugestão abre o evento; falha do autocomplete só esconde a lista.
+- **Filtros**: local (opções vindas da faceta `locations` da API), período (`De`/`Até`, dias inteiros no fuso do navegador) e "Só com ingressos disponíveis". "Buscar" chama `GET /events/search` (`hooks/useEventSearch.ts`), com paginação.
+- **Sem filtro**, a home mostra a lista de sempre (`GET /events`, lida do Postgres). Se a busca estiver fora do ar (503), aparece a mensagem da API com "Tentar novamente" e "Ver todos os eventos".
+- A disponibilidade nos cards da busca é aproximada ("Ingressos disponíveis"/"Esgotado"); o número exato fica na página do evento.
+
+> Rodando os testes de dentro de um caminho com diretório iniciado por ponto (ex.: uma worktree em `.claude/worktrees/...`), o `testMatch` com `<rootDir>` não encontra nada. Nesse caso: `npx jest --testMatch '**/__tests__/**/*.test.{ts,tsx}'`.
+
 ## Autenticação
 
 - Login social pelo Better Auth: `POST /api/auth/sign-in/social` devolve a URL do provedor e o navegador é redirecionado para ela. O `callbackURL` é a URL absoluta do front, com o `?redirect=` original.

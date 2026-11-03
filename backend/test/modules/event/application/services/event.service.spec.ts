@@ -16,6 +16,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   location: 'Arena',
   starts_at: new Date('2030-01-01T20:00:00Z'),
   capacity: 10,
+  available_tickets: 10,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00Z'),
   updated_at: new Date('2026-01-01T00:00:00Z'),
@@ -32,6 +33,8 @@ describe('EventService', () => {
       createWithTickets: vi.fn(),
       getUpcomingEvents: vi.fn(),
       getEventById: vi.fn(),
+      getEventIdsByOrganizer: vi.fn(),
+      refreshAvailableTickets: vi.fn(),
     };
 
     const module = await Test.createTestingModule({
@@ -79,6 +82,17 @@ describe('EventService', () => {
     eventRepository.getEventById.mockRejectedValue(new NotFoundException());
     await expect(service.getEventById(99)).rejects.toBeInstanceOf(
       NotFoundException,
+    );
+  });
+
+  it('getEventIdsByOrganizer delega para o repositório', async () => {
+    eventRepository.getEventIdsByOrganizer.mockResolvedValue([1, 4]);
+
+    await expect(service.getEventIdsByOrganizer('org-1')).resolves.toEqual([
+      1, 4,
+    ]);
+    expect(eventRepository.getEventIdsByOrganizer).toHaveBeenCalledWith(
+      'org-1',
     );
   });
 });

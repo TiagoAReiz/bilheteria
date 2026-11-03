@@ -6,6 +6,8 @@ import { PrismaService } from './../src/modules/prisma/prisma.service.js';
 
 // E2E sem banco: sobe o AppModule real (rotas, guard global do Better Auth, pipes)
 // trocando apenas o PrismaService por um fake em memoria. Nenhuma conexao e aberta.
+// O Elasticsearch aponta para uma porta fechada: a API precisa subir assim mesmo e
+// as rotas de busca respondem 503.
 // As variaveis abaixo sao fixas para o teste nao depender do .env local.
 const TEST_ENV: Record<string, string> = {
   DATABASE_URL: 'postgresql://e2e:e2e@127.0.0.1:1/e2e',
@@ -17,6 +19,10 @@ const TEST_ENV: Record<string, string> = {
   GOOGLE_CLIENT_SECRET: 'e2e-google-secret',
   FACEBOOK_CLIENT_ID: 'e2e-facebook-id',
   FACEBOOK_CLIENT_SECRET: 'e2e-facebook-secret',
+  ELASTICSEARCH_URL: 'http://127.0.0.1:1',
+  ELASTICSEARCH_REQUEST_TIMEOUT_MS: '500',
+  // o job de disponibilidade nao roda no e2e (o fake do Prisma nao tem $executeRaw)
+  AVAILABILITY_REFRESH_INTERVAL_MS: '0',
 };
 
 const upcoming = {
@@ -26,6 +32,7 @@ const upcoming = {
   location: 'Arena',
   starts_at: new Date('2099-01-01T20:00:00.000Z'),
   capacity: 10,
+  available_tickets: 10,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00.000Z'),
   updated_at: new Date('2026-01-01T00:00:00.000Z'),
@@ -151,6 +158,47 @@ describe('Bilheteria (e2e, sem banco)', () => {
     });
   });
 
+  describe('busca (Elasticsearch fora do ar)', () => {
+    it('GET /events/search responde 503 com mensagem clara (e não cai em /events/:id)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/events/search')
+        .query({ q: 'rock', available: 'true' })
+        .expect(503);
+      expect(res.body.message).toBe(
+        'A busca está temporariamente indisponível. Tente novamente em instantes.',
+      );
+    });
+
+    it('GET /events/suggest responde 503', async () => {
+      await request(app.getHttpServer())
+        .get('/events/suggest')
+        .query({ q: 'fes' })
+        .expect(503);
+    });
+
+    it('valida a query antes de ir ao Elasticsearch (400)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/events/search')
+        .query({ size: '999', available: 'talvez' })
+        .expect(400);
+      expect(res.body.message).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('size'),
+          expect.stringContaining('available'),
+        ]),
+      );
+    });
+
+    it('GET /events/suggest sem q é 400', async () => {
+      await request(app.getHttpServer()).get('/events/suggest').expect(400);
+    });
+
+    it('o resto da API continua funcionando (lê do Postgres)', async () => {
+      await request(app.getHttpServer()).get('/events').expect(200);
+      await request(app.getHttpServer()).get('/status/1').expect(200);
+    });
+  });
+
   describe('rotas protegidas sem sessão', () => {
     it.each([
       ['get', '/users/me'],
@@ -158,6 +206,7 @@ describe('Bilheteria (e2e, sem banco)', () => {
       ['patch', '/users/me/organizer'],
       ['post', '/reservation'],
       ['post', '/events'],
+      ['get', '/tickets/search'],
     ] as const)('%s %s retorna 401', async (method, path) => {
       await request(app.getHttpServer())[method](path).send({}).expect(401);
     });

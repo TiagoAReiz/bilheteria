@@ -25,6 +25,7 @@ const event: Event = {
   location: 'Arena',
   starts_at: new Date('2030-01-01T20:00:00Z'),
   capacity: 10,
+  available_tickets: 10,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00Z'),
   updated_at: new Date('2026-01-01T00:00:00Z'),
@@ -41,6 +42,7 @@ describe('EventController', () => {
       createEvent: vi.fn(),
       listUpcomingEvents: vi.fn(),
       getEventById: vi.fn(),
+      getEventIdsByOrganizer: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

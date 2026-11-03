@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "Ingressos para consulta operacional (ADMIN/ORGANIZER). Só campos operacionais: nada de CPF ou dados pessoais. Documento montado pela transform infra/search/sequin/transforms/ticket-document.exs",
+    "version": 1
+  },
+  "index_patterns": ["tickets_v*"],
+  "composed_of": ["bilheteria-analysis"],
+  "priority": 200,
+  "template": {
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "id": { "type": "integer" },
+        "event_id": { "type": "integer" },
+        "user_id": { "type": "keyword" },
+        "status": { "type": "keyword" },
+        "reserved_at": { "type": "date" },
+        "is_paid": { "type": "boolean" },
+        "deleted": { "type": "boolean" }
+      }
+    }
+  }
+}

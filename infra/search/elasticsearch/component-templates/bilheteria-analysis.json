@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "description": "Analisadores pt-BR compartilhados pelos índices da bilheteria",
+    "version": 1
+  },
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "analysis": {
+        "filter": {
+          "pt_br_stop": {
+            "type": "stop",
+            "stopwords": "_brazilian_"
+          },
+          "pt_br_stemmer": {
+            "type": "stemmer",
+            "language": "brazilian"
+          }
+        },
+        "analyzer": {
+          "pt_br": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "pt_br_stop", "asciifolding", "pt_br_stemmer"]
+          },
+          "pt_br_folded": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "asciifolding"]
+          }
+        }
+      }
+    }
+  }
+}

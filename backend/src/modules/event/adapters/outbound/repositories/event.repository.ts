@@ -18,6 +18,8 @@ export class EventRepository implements EventRepositoryPort {
                 location: event.location,
                 starts_at: event.starts_at,
                 capacity: event.capacity,
+                // todos os ingressos nascem livres; daqui em diante quem mantem e o job de disponibilidade
+                available_tickets: event.capacity,
                 organizer_id: event.organizer_id,
                 tickets: {
                     createMany: {data: Array.from({length: event.capacity}, () => ({is_paid: false}))},
@@ -39,5 +41,36 @@ export class EventRepository implements EventRepositoryPort {
             return event;
         }
         throw new NotFoundException(`O evento ${id} não foi encontrado`);
+    }
+
+    // inclui eventos excluidos: a posse dos ingressos continua sendo do organizador
+    async getEventIdsByOrganizer(organizerId: string): Promise<number[]> {
+        const events = await this.prisma.event.findMany({
+            where: {organizer_id: organizerId},
+            select: {id: true},
+            orderBy: {id: 'asc'},
+        });
+        return events.map((event) => event.id);
+    }
+
+    // um unico UPDATE em lote: conta os disponiveis com o mesmo criterio da reserva e do /status/:id
+    // e so grava onde o numero mudou, para nao gerar escrita (nem mensagem de CDC) a toa.
+    // Eventos passados ou excluidos ficam de fora: nao aparecem na busca.
+    async refreshAvailableTickets(reservationTtlMinutes: number): Promise<number> {
+        return await this.prisma.$executeRaw`
+            UPDATE event AS e
+            SET available_tickets = c.available
+            FROM (
+                SELECT ev.id,
+                       COUNT(t.id) FILTER (
+                           WHERE t.is_paid = false
+                             AND (t.reserved_at IS NULL OR t.reserved_at < NOW() - make_interval(mins => ${reservationTtlMinutes}))
+                       )::int AS available
+                FROM event AS ev
+                LEFT JOIN ticket AS t ON t.event_id = ev.id
+                WHERE ev.deleted_at IS NULL AND ev.starts_at > NOW()
+                GROUP BY ev.id
+            ) AS c
+            WHERE e.id = c.id AND e.available_tickets <> c.available`;
     }
 }
