@@ -3,6 +3,7 @@ import {Ticket} from "../../../core/entities/ticket.entity.js";
 import {ReservationResult, RESERVATION_TTL_MINUTES} from "../../../core/entities/reservation.entity.js";
 import {PrismaService} from "../../../../prisma/prisma.service.js";
 import {TicketRepositoryPort} from "../../../application/ports/outbound/repositories/ticket.repository.port.js";
+import {UserTicketRow} from "../../../core/entities/my-ticket.entity.js";
 
 @Injectable()
 export class TicketRepository implements TicketRepositoryPort {
@@ -64,5 +65,23 @@ export class TicketRepository implements TicketRepositoryPort {
     }
     async getCountAllTicketsByEvent(id: number):Promise<number> {
         return await this.prisma.ticket.count({where: {event_id: id}})
+    }
+
+    async getActiveTicketsByUser(user_id: string, reservedSince: Date): Promise<UserTicketRow[]> {
+        return await this.prisma.ticket.findMany({
+            where: {
+                user_id,
+                deleted_at: null,
+                event: {deleted_at: null},
+                OR: [{is_paid: true}, {reserved_at: {gte: reservedSince}}],
+            },
+            select: {
+                id: true,
+                is_paid: true,
+                reserved_at: true,
+                event: {select: {id: true, name: true, location: true, starts_at: true}},
+            },
+            orderBy: [{event: {starts_at: 'asc'}}, {id: 'asc'}],
+        });
     }
 }

@@ -34,6 +34,7 @@ describe('TicketController', () => {
     ticketService = {
       reserveTicket: vi.fn(),
       statusTicketsByEvent: vi.fn(),
+      listMyTickets: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -60,6 +61,23 @@ describe('TicketController', () => {
       expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
         RequestMethod.GET,
       );
+    });
+  });
+
+  describe('myTickets', () => {
+    it('lista os ingressos do usuário da sessão', async () => {
+      const mine = [{ id: 1, status: 'paid' as const, reserved_until: null, event: { id: 10, name: 'Show', location: 'Arena', starts_at: new Date() } }];
+      ticketService.listMyTickets.mockResolvedValue(mine);
+
+      await expect(controller.myTickets(session)).resolves.toBe(mine);
+      expect(ticketService.listMyTickets).toHaveBeenCalledWith('user-1');
+    });
+
+    it('exige sessão e é mapeada em GET /tickets/me', () => {
+      const handler = handlerOf(TicketController, 'myTickets');
+      expect(reflector.get(PUBLIC_KEY, handler)).toBeUndefined();
+      expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('/tickets/me');
+      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.GET);
     });
   });
 
@@ -94,7 +112,7 @@ describe('TicketController', () => {
           handlerOf(TicketController, name as keyof TicketController),
         ) as unknown,
       );
-    expect(routes).toEqual(['/status/:id', '/reservation']);
+    expect(routes).toEqual(['/status/:id', '/tickets/me', '/reservation']);
   });
 
   it('a classe não é pública como um todo', () => {

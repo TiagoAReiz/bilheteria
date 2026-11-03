@@ -1,7 +1,8 @@
 import {ConflictException, ForbiddenException, Inject, Injectable, NotFoundException} from '@nestjs/common';
 import {Status} from "../../core/entities/status.entity.js";
 import {Ticket} from "../../core/entities/ticket.entity.js";
-import {MAX_TICKETS_PER_USER_PER_EVENT, ReservationResult} from "../../core/entities/reservation.entity.js";
+import {MAX_TICKETS_PER_USER_PER_EVENT, RESERVATION_TTL_MINUTES, ReservationResult} from "../../core/entities/reservation.entity.js";
+import {MyTicket} from "../../core/entities/my-ticket.entity.js";
 import {TicketServicePort} from "../ports/inbound/services/ticket.service.port.js";
 import {TICKET_REPOSITORY, type TicketRepositoryPort} from "../ports/outbound/repositories/ticket.repository.port.js";
 import {TICKET_METRICS, type TicketMetricsPort} from "../ports/outbound/metrics/ticket-metrics.port.js";
@@ -83,5 +84,16 @@ export class TicketService implements TicketServicePort {
     let reserved = total - available;
     return {total, available, reserved}
   }
-}
 
+  async listMyTickets(user_id: string): Promise<MyTicket[]> {
+    const ttlMs = RESERVATION_TTL_MINUTES * 60 * 1000;
+    const rows = await this.ticketRepository.getActiveTicketsByUser(user_id, new Date(Date.now() - ttlMs));
+    return rows.map((row) => ({
+      id: row.id,
+      status: row.is_paid ? 'paid' : 'reserved',
+      // reserved_at nunca é nulo numa reserva ativa (o filtro exige reserved_at >= corte)
+      reserved_until: row.is_paid || !row.reserved_at ? null : new Date(row.reserved_at.getTime() + ttlMs),
+      event: row.event,
+    }));
+  }
+}

@@ -73,6 +73,7 @@ describe('TicketService', () => {
       getTicketsByUserAndEvent: vi.fn(),
       getCountAvailablesTicketsByEvent: vi.fn(),
       getCountAllTicketsByEvent: vi.fn(),
+      getActiveTicketsByUser: vi.fn(),
     };
     userService = {
       registerCpf: vi.fn(),
@@ -359,6 +360,33 @@ describe('TicketService', () => {
       expect(
         ticketRepository.getCountAvailablesTicketsByEvent,
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listMyTickets', () => {
+    const event = { id: 10, name: 'Show', location: 'Arena', starts_at: new Date('2026-12-20T20:00:00Z') };
+
+    it('busca só pagos e reservas dentro do TTL (corte = agora - 5 min)', async () => {
+      ticketRepository.getActiveTicketsByUser.mockResolvedValue([]);
+
+      await expect(service.listMyTickets('user-1')).resolves.toEqual([]);
+      expect(ticketRepository.getActiveTicketsByUser).toHaveBeenCalledWith(
+        'user-1',
+        new Date(NOW.getTime() - 5 * 60 * 1000),
+      );
+    });
+
+    it('pago vira paid sem prazo; reserva vira reserved com fim = reserved_at + TTL', async () => {
+      const reservedAt = new Date(NOW.getTime() - 60 * 1000);
+      ticketRepository.getActiveTicketsByUser.mockResolvedValue([
+        { id: 1, is_paid: true, reserved_at: new Date('2026-06-01T00:00:00Z'), event },
+        { id: 2, is_paid: false, reserved_at: reservedAt, event },
+      ]);
+
+      await expect(service.listMyTickets('user-1')).resolves.toEqual([
+        { id: 1, status: 'paid', reserved_until: null, event },
+        { id: 2, status: 'reserved', reserved_until: new Date(reservedAt.getTime() + 5 * 60 * 1000), event },
+      ]);
     });
   });
 });

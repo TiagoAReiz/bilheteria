@@ -15,6 +15,12 @@ export class TicketController {
     return this.ticketService.statusTicketsByEvent(id);
   }
 
+  // ingressos pagos e reservas ainda válidas do usuário logado ("Minhas reservas")
+  @Get("/tickets/me")
+  myTickets(@Session() session: UserSession) {
+    return this.ticketService.listMyTickets(session.user.id);
+  }
+
   @Post("/reservation")
   reservation(@Session() session: UserSession, @Body() dto :ReservationDto) {
     return this.ticketService.reserveTicket(session.user.id,dto.event_id);
