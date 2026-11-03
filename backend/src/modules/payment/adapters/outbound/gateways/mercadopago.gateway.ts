@@ -234,10 +234,14 @@ export class MercadoPagoGateway implements PaymentGatewayPort {
         if (response.ok) {
             return (await response.json().catch(() => null)) as T | null;
         }
-        if (response.status === 404 && options.notFoundAsNull) {
+        const code = await errorCode(response);
+        // id que o Mercado Pago não conhece (404) ou nem aceita como id (400 invalid_path_param):
+        // falha permanente. Devolver null deixa o webhook responder 200 em vez de pedir reenvio por 48h.
+        if (options.notFoundAsNull
+            && (response.status === 404 || (response.status === 400 && code === 'invalid_path_param'))) {
+            this.logger.warn(`Mercado Pago não reconhece o recurso ao ${action} (${response.status} ${code ?? 'sem código'})`);
             return null;
         }
-        const code = await errorCode(response);
         // nunca loga headers nem corpo: o corpo pode ter e-mail do comprador
         this.logger.warn(`Mercado Pago respondeu ${response.status} (${code ?? 'sem código'}) ao ${action}`);
         if (response.status === 429 || response.status >= 500) {

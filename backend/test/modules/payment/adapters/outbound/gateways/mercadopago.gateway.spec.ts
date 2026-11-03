@@ -181,10 +181,10 @@ describe('MercadoPagoGateway', () => {
     });
 
     it('4xx é recusa, com o código do Mercado Pago', async () => {
-      fetchMock.mockResolvedValue(jsonResponse(400, { errors: [{ code: 'invalid_path_param' }] }));
+      fetchMock.mockResolvedValue(jsonResponse(401, { errors: [{ code: 'unauthorized' }] }));
       await expect(gateway.getOrder('ORDTST01')).rejects.toMatchObject({
         name: 'PaymentGatewayRejectedError',
-        code: 'invalid_path_param',
+        code: 'unauthorized',
       });
     });
   });
@@ -211,6 +211,16 @@ describe('MercadoPagoGateway', () => {
     it('404: null', async () => {
       fetchMock.mockResolvedValue(jsonResponse(404, { errors: [{ code: 'order_not_found' }] }));
       await expect(gateway.getOrder('ORDTST01')).resolves.toBeNull();
+    });
+
+    it('400 invalid_path_param (id que o Mercado Pago não aceita): null', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(400, { errors: [{ code: 'invalid_path_param' }] }));
+      await expect(gateway.getOrder('ORDTST01SIMULACAO')).resolves.toBeNull();
+    });
+
+    it('outro 400 continua sendo recusa', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(400, { errors: [{ code: 'bad_request' }] }));
+      await expect(gateway.getOrder('ORDTST01')).rejects.toBeInstanceOf(PaymentGatewayRejectedError);
     });
 
     it('id com caracteres inválidos: null sem chamar a rede (nada de path injection)', async () => {
