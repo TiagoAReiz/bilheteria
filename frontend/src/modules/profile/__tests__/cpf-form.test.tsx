@@ -24,6 +24,13 @@ describe("<CpfForm />", () => {
     expect(screen.getByText("não pode ser alterado depois")).toBeInTheDocument();
   });
 
+  it("registered: já mostra CPF cadastrado e trava o formulário", () => {
+    render(<CpfForm registered />);
+    expect(screen.getByText("CPF cadastrado")).toBeInTheDocument();
+    expect(getInput()).toBeDisabled();
+    expect(getSubmit()).toBeDisabled();
+  });
+
   it("aplica a máscara enquanto digita", async () => {
     render(<CpfForm />);
     await userEvent.type(getInput(), VALID_CPF);

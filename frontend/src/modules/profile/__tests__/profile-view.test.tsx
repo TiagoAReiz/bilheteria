@@ -4,6 +4,7 @@ import { makeUser, sessionValue } from "@test/helpers";
 import { useSession } from "@/shared/hooks/useSession";
 import { ProfileView } from "../components/profile-view";
 import { profileService } from "../services/profile.service";
+import type { UserMeResponse } from "../types/profile.dto";
 
 jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
 jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
@@ -25,6 +26,10 @@ jest.mock("@/shared/lib/image-upload", () => ({
 
 const svc = jest.mocked(profileService);
 
+function makeMe(overrides: Partial<UserMeResponse> = {}): UserMeResponse {
+  return { ...makeUser(), hasCpf: false, ...overrides };
+}
+
 describe("<ProfileView />", () => {
   beforeEach(() => {
     jest.resetAllMocks();
@@ -32,7 +37,7 @@ describe("<ProfileView />", () => {
   });
 
   it("mostra os dados do usuário e o botão de organizador para USER", async () => {
-    svc.getMe.mockResolvedValue(makeUser({ name: "João", email: "joao@x.com" }));
+    svc.getMe.mockResolvedValue(makeMe({ name: "João", email: "joao@x.com" }));
     render(<ProfileView />);
 
     expect(await screen.findByText("João")).toBeInTheDocument();
@@ -42,7 +47,7 @@ describe("<ProfileView />", () => {
   });
 
   it("não mostra o botão para ORGANIZER", async () => {
-    svc.getMe.mockResolvedValue(makeUser({ role: "ORGANIZER" }));
+    svc.getMe.mockResolvedValue(makeMe({ role: "ORGANIZER" }));
     render(<ProfileView />);
     expect(await screen.findByText("Organizador")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Quero ser organizador" })).not.toBeInTheDocument();
@@ -51,7 +56,7 @@ describe("<ProfileView />", () => {
   it("vira organizador e recarrega perfil e sessão", async () => {
     const session = sessionValue(makeUser());
     jest.mocked(useSession).mockReturnValue(session);
-    svc.getMe.mockResolvedValueOnce(makeUser()).mockResolvedValueOnce(makeUser({ role: "ORGANIZER" }));
+    svc.getMe.mockResolvedValueOnce(makeMe()).mockResolvedValueOnce(makeMe({ role: "ORGANIZER" }));
     svc.becomeOrganizer.mockResolvedValue();
     render(<ProfileView />);
 
@@ -65,14 +70,14 @@ describe("<ProfileView />", () => {
   describe("foto de perfil", () => {
     it("mostra a foto enviada no lugar da do Google", async () => {
       svc.getMe.mockResolvedValue(
-        makeUser({ image: "https://google/foto.jpg", avatarUrl: "http://cdn/users/u/avatar/a.png", avatarKey: "users/u/avatar/a.png" }),
+        makeMe({ image: "https://google/foto.jpg", avatarUrl: "http://cdn/users/u/avatar/a.png", avatarKey: "users/u/avatar/a.png" }),
       );
       render(<ProfileView />);
       expect(await screen.findByRole("button", { name: /remover foto/i })).toBeInTheDocument();
     });
 
     it("sem foto enviada não oferece remover", async () => {
-      svc.getMe.mockResolvedValue(makeUser({ image: "https://google/foto.jpg", avatarKey: null }));
+      svc.getMe.mockResolvedValue(makeMe({ image: "https://google/foto.jpg", avatarKey: null }));
       render(<ProfileView />);
       expect(await screen.findByRole("button", { name: /trocar foto/i })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /remover foto/i })).not.toBeInTheDocument();
@@ -81,7 +86,7 @@ describe("<ProfileView />", () => {
     it("trocar a foto envia direto ao bucket, confirma e recarrega perfil e sessão (header)", async () => {
       const session = sessionValue(makeUser());
       jest.mocked(useSession).mockReturnValue(session);
-      svc.getMe.mockResolvedValue(makeUser());
+      svc.getMe.mockResolvedValue(makeMe());
       svc.createAvatarUpload.mockResolvedValue({
         url: "http://s3/b",
         fields: {},
@@ -99,6 +104,23 @@ describe("<ProfileView />", () => {
       expect(svc.confirmAvatar).toHaveBeenCalledWith("users/user-1/avatar/a.png");
       expect(session.refresh).toHaveBeenCalled();
       expect(svc.getMe).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("CPF", () => {
+    it("conta sem CPF vê o formulário habilitado", async () => {
+      svc.getMe.mockResolvedValue(makeMe({ hasCpf: false }));
+      render(<ProfileView />);
+      expect(await screen.findByLabelText("CPF")).toBeEnabled();
+      expect(screen.queryByText("CPF cadastrado")).not.toBeInTheDocument();
+    });
+
+    it("conta com CPF vê o aviso de cadastrado e o campo travado", async () => {
+      svc.getMe.mockResolvedValue(makeMe({ hasCpf: true }));
+      render(<ProfileView />);
+      expect(await screen.findByText("CPF cadastrado")).toBeInTheDocument();
+      expect(screen.getByLabelText("CPF")).toBeDisabled();
+      expect(screen.getByRole("button", { name: /cadastrar cpf/i })).toBeDisabled();
     });
   });
 });

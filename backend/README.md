@@ -106,7 +106,7 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 
 | Método | Rota | Auth | Descrição |
 | --- | --- | --- | --- |
-| GET | `/users/me` | sim | usuário da sessão (com `avatarUrl` e `avatarKey`) |
+| GET | `/users/me` | sim | usuário da sessão (com `avatarUrl` e `avatarKey`) + `hasCpf` (só o booleano; o hash nunca sai) |
 | PATCH | `/users/me/cpf` | sim | cadastra o CPF (uma vez) |
 | PATCH | `/users/me/organizer` | sim | vira `ORGANIZER` (sem restrições por enquanto) |
 | POST | `/users/me/avatar/upload-url` | sim | `{ content_type }` → POST pré-assinado `{ url, fields, key, max_bytes, expires_at }` |

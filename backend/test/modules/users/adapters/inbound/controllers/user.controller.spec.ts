@@ -61,10 +61,19 @@ describe('UserController', () => {
   });
 
   describe('me', () => {
-    it('retorna o usuário da sessão sem chamar a porta', () => {
-      expect(controller.me(session)).toBe(session.user);
+    it('retorna o usuário da sessão com hasCpf', async () => {
+      userService.hasCpf.mockResolvedValue(true);
+      await expect(controller.me(session)).resolves.toEqual({
+        ...session.user,
+        hasCpf: true,
+      });
+      expect(userService.hasCpf).toHaveBeenCalledWith('user-1');
       expect(userService.registerCpf).not.toHaveBeenCalled();
-      expect(userService.hasCpf).not.toHaveBeenCalled();
+    });
+
+    it('hasCpf false quando a conta ainda não tem CPF', async () => {
+      userService.hasCpf.mockResolvedValue(false);
+      await expect(controller.me(session)).resolves.toMatchObject({ hasCpf: false });
     });
 
     it('é mapeada em GET /users/me', () => {

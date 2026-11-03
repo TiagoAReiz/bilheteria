@@ -15,12 +15,15 @@ import { useRegisterCpf } from "../hooks/useRegisterCpf";
 interface CpfFormProps {
   /** Para onde voltar depois de cadastrar (ex.: o evento que pediu o CPF). */
   returnTo?: string | null;
+  /** A conta já tem CPF (vem de GET /users/me): mostra o aviso em vez de um formulário utilizável. */
+  registered?: boolean;
 }
 
-export function CpfForm({ returnTo }: CpfFormProps) {
+export function CpfForm({ returnTo, registered = false }: CpfFormProps) {
   const [cpf, setCpf] = useState("");
   const [touched, setTouched] = useState(false);
-  const { register, loading, error, locked } = useRegisterCpf();
+  const { register, loading, error, locked: justLocked } = useRegisterCpf();
+  const locked = registered || justLocked;
 
   const complete = onlyDigits(cpf).length === 11;
   const valid = isValidCpf(cpf);
