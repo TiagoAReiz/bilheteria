@@ -8,11 +8,13 @@ Cada módulo segue arquitetura hexagonal (ports & adapters). O domínio e a apli
 
 ```
 src/
+├── instrumentation.ts         # OpenTelemetry SDK, carregado antes do app (node --import)
 ├── main.ts
 ├── app.module.ts
 ├── generated/prisma/          # client gerado pelo Prisma (não editar, não versionado)
 └── modules/
     ├── prisma/                # PrismaService compartilhado entre módulos
+    ├── observability/         # logger (pino), Meter/Tracer do OTel e a porta TRACING
     └── <modulo>/
         ├── <modulo>.module.ts         # liga portas às implementações (DI)
         ├── core/
@@ -22,6 +24,7 @@ src/
         │   │   ├── inbound/services/      # interfaces dos casos de uso (o que o módulo oferece)
         │   │   └── outbound/              # interfaces do que o módulo precisa
         │   │       ├── repositories/      # acesso a banco
+        │   │       ├── metrics/           # métricas de negócio em termos do domínio
         │   │       └── ...                # outras dependências externas (crypto, gateways)
         │   └── services/              # implementação dos casos de uso (implements porta inbound)
         └── adapters/
@@ -29,6 +32,7 @@ src/
             ├── inbound/controllers/   # controllers HTTP: chamam as portas inbound
             └── outbound/
                 ├── repositories/      # implementação das portas outbound com Prisma
+                ├── metrics/           # implementação das portas de métricas com OpenTelemetry
                 └── ...                # outras integrações (auth, crypto, gateways)
 ```
 
@@ -157,13 +161,98 @@ Variáveis (ver `.env.example`):
 | `CPF_HASH_SECRET` | chave do HMAC do CPF; trocar invalida os hashes existentes |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth Google |
 | `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | OAuth Facebook |
+| `OTEL_*`, `LOG_LEVEL`, `NODE_ENV` | opcionais, ver [Observabilidade](#observabilidade) |
 
 Depois de alterar `prisma/schema.prisma`, rode `npx prisma generate --config prisma7.config.ts` (ou `migrate dev`, que já gera).
+
+## Observabilidade
+
+Traces, métricas e logs saem do backend via OpenTelemetry (OTLP/HTTP) para o Grafana Alloy do `docker-compose.yaml` da raiz, que distribui para Tempo, Prometheus e Loki. Visão geral da stack, portas e dashboards no [README da raiz](../README.md#observabilidade).
+
+### Como a instrumentação é carregada
+
+`src/instrumentation.ts` inicia o `NodeSDK` e precisa rodar **antes** de qualquer import do app, para aplicar os patches em `http`, `express`, `pg` e `pino`. Por isso ele é passado ao Node com `--import` nos scripts (o build gera `dist/instrumentation.js` ao lado de `dist/main.js`):
+
+```bash
+# start:prod
+node --env-file-if-exists=.env --import ./dist/instrumentation.js dist/main
+# start / start:dev / start:debug: o nest start recompila e roda o dist com o mesmo node
+nest start --watch --exec "node --env-file-if-exists=.env --import ./dist/instrumentation.js"
+```
+
+- `--env-file-if-exists=.env`: o SDK roda antes do `ConfigModule`, então as variáveis `OTEL_*` do `.env` precisam ser carregadas pelo próprio Node.
+- O app é ESM, mas os pacotes instrumentados são CommonJS e passam pelo `require` mesmo quando importados de ESM; por isso não usamos o loader do `import-in-the-middle` (testado: só somava spans duplicados e tempo de boot). Se um dia instrumentarmos um pacote ESM puro, ele volta a ser necessário.
+- Instrumentações: auto-instrumentations do OTel (http, express, pg, pino, undici, métricas de runtime do Node...) com `fs`, `dns`, `net`, `router` e `nestjs-core` desligadas (ruído, duplicadas ou sem suporte ao Nest 12) e os middlewares do express ignorados; `@prisma/instrumentation` para os spans do Prisma. O `pg` nunca coloca valores de parâmetros nos spans e a query string do callback OAuth (`code`, `state`) é mascarada.
+- Resource: `service.name=bilheteria-backend`, `service.version` (do `package.json`), `service.instance.id` (UUID por processo, vira o label `instance`) e `deployment.environment` / `deployment.environment.name` (de `NODE_ENV`, default `development`).
+- Shutdown: no SIGTERM/SIGINT o Nest fecha o app e o `ObservabilityModule.onApplicationShutdown` faz o flush do que está em buffer. Falha de exportação (coletor fora do ar) só gera log de diagnóstico; nunca derruba o app.
+- Os testes (`vitest`) não carregam a instrumentação: a API do OTel devolve implementações no-op e os logs ficam em `silent`.
+
+### Logs
+
+`nestjs-pino` substitui o logger do Nest. Em dev (`NODE_ENV` diferente de `production`) sai em `pino-pretty` no terminal; em produção, JSON por linha. Cada requisição gera um log `request completed` (nível `warn` para 4xx e `error` para 5xx).
+
+- **Correlação**: a `@opentelemetry/instrumentation-pino` injeta `trace_id`, `span_id` e `trace_flags` em toda linha emitida dentro de uma requisição.
+- **Envio ao Loki**: a mesma instrumentação encaminha cada linha ao Logs SDK do OTel, que exporta via OTLP junto com traces e métricas. Escolhida em vez do `pino-opentelemetry-transport` porque reaproveita o SDK já iniciado (mesmo resource, endpoint, batching e flush no shutdown), sem um worker thread com configuração própria.
+- **Redact** (`modules/observability/adapters/outbound/logging/pino-http.options.ts`): `cookie` e `authorization` da requisição, `set-cookie` da resposta e `cpf`, `cpfHash`, `password`, `secret`, `token`... em objetos logados viram `[REDACTED]` antes de sair para qualquer destino. A URL é logada sem query string.
+
+### Métricas de negócio
+
+Os services não conhecem OpenTelemetry: cada módulo declara uma **porta outbound de métricas** com métodos do domínio, e um adapter OTel a implementa (mesmo padrão dos repositórios).
+
+```ts
+// ticket/application/ports/outbound/metrics/ticket-metrics.port.ts
+export const TICKET_METRICS = Symbol('TICKET_METRICS');
+
+export interface TicketMetricsPort {
+    reservationAttempted(outcome: ReservationOutcome, durationMs: number): void;
+    paymentConfirmed(): void;
+    paymentRejected(reason: PaymentRejectionReason): void;
+}
+
+// ticket.module.ts
+{provide: TICKET_METRICS, useClass: OtelTicketMetrics},   // adapters/outbound/metrics/otel-ticket-metrics.ts
+```
+
+O adapter recebe o `Meter` por DI (`OTEL_METER`, exportado pelo `ObservabilityModule`), o que permite testá-lo com um `MeterProvider` em memória (`test/utils/otel.ts`). Para uma métrica nova: método na porta, implementação no adapter, chamada no service, teste do adapter e do service.
+
+| Métrica (Prometheus) | Tipo | Labels | Significado |
+| --- | --- | --- | --- |
+| `bilheteria_reservations_total` | counter | `outcome` | tentativas de reserva por desfecho: `reserved`, `limit_reached`, `sold_out`, `no_cpf`, `event_started`, `event_not_found` |
+| `bilheteria_reservation_duration_seconds` | histograma | `outcome` | duração da tentativa de reserva (mesmos desfechos) |
+| `bilheteria_payments_confirmed_total` | counter | — | pagamentos confirmados |
+| `bilheteria_payments_rejected_total` | counter | `reason` | confirmações recusadas: `expired`, `wrong_owner` |
+| `bilheteria_events_created_total` | counter | — | eventos criados |
+
+No código os instrumentos têm nomes OTel (`bilheteria.reservations`, `bilheteria.reservation.duration` em segundos...); o Alloy converte para os nomes acima. **Nunca** use id de usuário, evento ou ticket como label: cada valor distinto cria uma série nova no Prometheus. Ids vão em atributos de span.
+
+Erro inesperado (ex.: banco fora) não conta como desfecho de negócio: aparece como 5xx nas métricas HTTP e como span com erro.
+
+Também chegam, sem código nosso: `http_server_request_duration_seconds` (por `http_route`, método e status), pool do `pg` (`db_client_connection_*`), event loop/GC/heap do Node (`nodejs_*`, `v8js_*`) e, gerados pelo Tempo, `traces_spanmetrics_*` e `traces_service_graph_*` (com exemplars).
+
+### Traces
+
+Spans automáticos de HTTP, rotas do express, Better Auth, Prisma e `pg`. Span manual só onde agrega: `ticket.reserve`, com os atributos `event.id` e `outcome`, aberto pela porta `TRACING` (`modules/observability/application/ports/outbound/tracing/tracing.port.ts`) para o service continuar sem OpenTelemetry. Recusa de negócio (4xx) fica registrada como evento no span, mas não marca o span como erro.
+
+### Variáveis
+
+| Variável | Default | Uso |
+| --- | --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | coletor OTLP/HTTP (o Alloy) |
+| `OTEL_SDK_DISABLED` | `false` | `true` desliga traces, métricas e envio de logs |
+| `OTEL_METRIC_EXPORT_INTERVAL` | `15000` | ms entre envios de métricas |
+| `OTEL_LOG_LEVEL` | — | diagnóstico do próprio SDK (`error`, `warn`, `debug`...) |
+| `OTEL_NODE_DISABLED_INSTRUMENTATIONS` | — | desliga instrumentações extras, ex.: `undici,runtime-node` |
+| `LOG_LEVEL` | `info` (`silent` com `NODE_ENV=test`) | nível do pino |
+| `NODE_ENV` | `development` | `production` = logs em JSON; também vira `deployment.environment` |
+
+As demais `OTEL_*` da especificação (headers, timeouts, sampler...) também são respeitadas pelo SDK.
+
+**Desligar**: `OTEL_SDK_DISABLED=true` no `.env` (o app sobe normalmente, só com logs no terminal) ou rodar sem o `--import` (`node dist/main`).
 
 ## Scripts
 
 ```bash
-npm run start:dev    # dev com watch
+npm run start:dev    # dev com watch (já com a instrumentação)
 npm run build        # build
 npm run lint         # oxlint
 npm run test         # testes unitários (vitest)
@@ -173,12 +262,13 @@ npm run test:load    # teste de carga (API rodando)
 
 ## Próximos passos
 
-1. **Observabilidade com Grafana**
-   - OpenTelemetry no NestJS (`sdk-node`, auto-instrumentations, `@prisma/instrumentation`) e logs com `nestjs-pino` correlacionados ao trace.
-   - Grafana Alloy como coletor; Prometheus (métricas), Loki (logs) e Tempo (traces); `postgres_exporter` e cAdvisor.
-   - Grafana Faro no front (erros JS e Web Vitals).
-   - Métricas de negócio: reservas por resultado (`reserved`, `limit_reached`, `sold_out`), duração da reserva, conversão reserva → pagamento.
-   - Dashboards (API RED, Postgres, negócio) e alertas (5xx, p95 do `/reservation`, pool de conexões, slot de replicação).
+1. **Observabilidade com Grafana** — feito (ver [Observabilidade](#observabilidade)), falta só o Faro:
+   - [x] OpenTelemetry no NestJS (`sdk-node`, auto-instrumentations, `@prisma/instrumentation`) e logs com `nestjs-pino` correlacionados ao trace.
+   - [x] Grafana Alloy como coletor; Prometheus (métricas), Loki (logs) e Tempo (traces); `postgres_exporter`.
+   - [x] Métricas de negócio: reservas por resultado, duração da reserva, pagamentos, conversão reserva → pagamento, eventos criados.
+   - [x] Dashboards (API RED, negócio, Postgres, logs) e alertas (5xx, p95 do `/reservation`, conexões do Postgres).
+   - [ ] **Grafana Faro no front** (erros JS e Web Vitals), enviando para o Alloy (`faro.receiver`).
+   - Quando fizer sentido: cAdvisor (containers), Alertmanager com contact point e alerta de slot de replicação (depende do `wal_level=logical` do item 2).
 2. **Busca com Elasticsearch + Sequin (CDC, sem Kafka)**
    - Postgres com `wal_level=logical` e publicação das tabelas; Sequin enviando mudanças direto para o Elasticsearch, com backfill.
    - Índice `events` com analisador pt-BR (sem acento, stemming), autocomplete e filtros (cidade, data, disponibilidade).

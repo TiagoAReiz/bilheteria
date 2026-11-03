@@ -19,6 +19,15 @@ import {
   type EventServicePort,
 } from '../../../../../src/modules/event/application/ports/inbound/services/event.service.port.js';
 import {
+  TICKET_METRICS,
+  type TicketMetricsPort,
+} from '../../../../../src/modules/ticket/application/ports/outbound/metrics/ticket-metrics.port.js';
+import {
+  TRACING,
+  type ActiveSpan,
+  type TracingPort,
+} from '../../../../../src/modules/observability/application/ports/outbound/tracing/tracing.port.js';
+import {
   MAX_TICKETS_PER_USER_PER_EVENT,
   RESERVATION_TTL_MINUTES,
 } from '../../../../../src/modules/ticket/core/entities/reservation.entity.js';
@@ -56,6 +65,9 @@ describe('TicketService', () => {
   let ticketRepository: MockPort<TicketRepositoryPort>;
   let userService: MockPort<UserServicePort>;
   let eventService: MockPort<EventServicePort>;
+  let metrics: MockPort<TicketMetricsPort>;
+  let tracing: MockPort<TracingPort>;
+  let span: MockPort<ActiveSpan>;
 
   beforeEach(async () => {
     ticketRepository = {
@@ -77,12 +89,25 @@ describe('TicketService', () => {
       getEventById: vi.fn().mockResolvedValue(makeEvent()),
     };
 
+    metrics = {
+      reservationAttempted: vi.fn(),
+      paymentConfirmed: vi.fn(),
+      paymentRejected: vi.fn(),
+    };
+    // tracing de verdade fica no OtelTracing; aqui só executa o trabalho com um span fake
+    span = { setAttributes: vi.fn() };
+    tracing = {
+      inSpan: vi.fn((_name, _attributes, work) => work(span)) as MockPort<TracingPort>['inSpan'],
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TicketService,
         { provide: TICKET_REPOSITORY, useValue: ticketRepository },
         { provide: USER_SERVICE, useValue: userService },
         { provide: EVENT_SERVICE, useValue: eventService },
+        { provide: TICKET_METRICS, useValue: metrics },
+        { provide: TRACING, useValue: tracing },
       ],
     }).compile();
 
@@ -179,9 +204,192 @@ describe('TicketService', () => {
         'Não há ingressos disponíveis para o evento 10',
       );
     });
+
+    describe('métrica e span da reserva', () => {
+      // cada caminho de reserveTicket e o outcome que ele precisa registrar
+      const scenarios: [
+        string,
+        () => void,
+        Parameters<TicketMetricsPort['reservationAttempted']>[0],
+      ][] = [
+        [
+          'reservado',
+          () =>
+            ticketRepository.reserveTicketWithinLimit.mockResolvedValue({
+              outcome: 'reserved',
+              ticket: makeTicket(),
+            }),
+          'reserved',
+        ],
+        [
+          'sem CPF',
+          () => userService.hasCpf.mockResolvedValue(false),
+          'no_cpf',
+        ],
+        [
+          'evento inexistente',
+          () =>
+            eventService.getEventById.mockRejectedValue(
+              new NotFoundException(),
+            ),
+          'event_not_found',
+        ],
+        [
+          'evento já começou',
+          () =>
+            eventService.getEventById.mockResolvedValue(
+              makeEvent({ starts_at: new Date(NOW) }),
+            ),
+          'event_started',
+        ],
+        [
+          'limite atingido',
+          () =>
+            ticketRepository.reserveTicketWithinLimit.mockResolvedValue({
+              outcome: 'limit_reached',
+            }),
+          'limit_reached',
+        ],
+        [
+          'esgotado',
+          () =>
+            ticketRepository.reserveTicketWithinLimit.mockResolvedValue({
+              outcome: 'sold_out',
+            }),
+          'sold_out',
+        ],
+      ];
+
+      it.each(scenarios)(
+        '%s: registra uma tentativa com outcome %s e marca o span',
+        async (_caso, arrange, outcome) => {
+          arrange();
+
+          await service.reserveTicket('user-1', 10).catch(() => undefined);
+
+          expect(metrics.reservationAttempted).toHaveBeenCalledTimes(1);
+          expect(metrics.reservationAttempted).toHaveBeenCalledWith(
+            outcome,
+            expect.any(Number),
+          );
+          const [, durationMs] = metrics.reservationAttempted.mock.calls[0];
+          expect(durationMs).toBeGreaterThanOrEqual(0);
+          expect(span.setAttributes).toHaveBeenCalledWith({ outcome });
+        },
+      );
+
+      it('executa a reserva dentro do span ticket.reserve com o event.id', async () => {
+        ticketRepository.reserveTicketWithinLimit.mockResolvedValue({
+          outcome: 'reserved',
+          ticket: makeTicket(),
+        });
+
+        await service.reserveTicket('user-1', 10);
+
+        expect(tracing.inSpan).toHaveBeenCalledWith(
+          'ticket.reserve',
+          { 'event.id': 10 },
+          expect.any(Function),
+        );
+      });
+
+      it('relança o NotFound original do evento', async () => {
+        const notFound = new NotFoundException('O evento 10 não foi encontrado');
+        eventService.getEventById.mockRejectedValue(notFound);
+
+        await expect(service.reserveTicket('user-1', 10)).rejects.toBe(
+          notFound,
+        );
+      });
+
+      it('erro inesperado (ex.: banco fora) propaga sem métrica de negócio', async () => {
+        const failure = new Error('connection refused');
+        ticketRepository.reserveTicketWithinLimit.mockRejectedValue(failure);
+
+        await expect(service.reserveTicket('user-1', 10)).rejects.toBe(
+          failure,
+        );
+        expect(metrics.reservationAttempted).not.toHaveBeenCalled();
+      });
+
+      it('erro inesperado ao buscar o evento também propaga sem métrica', async () => {
+        const failure = new Error('timeout');
+        eventService.getEventById.mockRejectedValue(failure);
+
+        await expect(service.reserveTicket('user-1', 10)).rejects.toBe(
+          failure,
+        );
+        expect(metrics.reservationAttempted).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('confirmTicketPayment', () => {
+    describe('métricas de pagamento', () => {
+      it('pagamento confirmado: paymentConfirmed depois de salvar', async () => {
+        ticketRepository.getTicketById.mockResolvedValue(makeTicket());
+        ticketRepository.updateTicket.mockImplementation(async (t) => t);
+
+        await service.confirmTicketPayment(1, 'user-1');
+
+        expect(metrics.paymentConfirmed).toHaveBeenCalledTimes(1);
+        expect(metrics.paymentRejected).not.toHaveBeenCalled();
+      });
+
+      it('ticket de outro usuário: paymentRejected(wrong_owner)', async () => {
+        ticketRepository.getTicketById.mockResolvedValue(
+          makeTicket({ user_id: 'other-user' }),
+        );
+
+        await expect(
+          service.confirmTicketPayment(1, 'user-1'),
+        ).rejects.toBeInstanceOf(ConflictException);
+
+        expect(metrics.paymentRejected).toHaveBeenCalledExactlyOnceWith(
+          'wrong_owner',
+        );
+        expect(metrics.paymentConfirmed).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['expirada', { reserved_at: new Date(NOW.getTime() - TTL_MS - 1) }],
+        ['sem reserved_at', { reserved_at: null }],
+      ])(
+        'reserva %s: paymentRejected(expired)',
+        async (_caso, overrides: Partial<Ticket>) => {
+          ticketRepository.getTicketById.mockResolvedValue(
+            makeTicket(overrides),
+          );
+
+          await expect(
+            service.confirmTicketPayment(1, 'user-1'),
+          ).rejects.toThrow(/expirou/);
+
+          expect(metrics.paymentRejected).toHaveBeenCalledExactlyOnceWith(
+            'expired',
+          );
+        },
+      );
+
+      it('ticket inexistente e falha ao salvar não geram métrica', async () => {
+        ticketRepository.getTicketById.mockRejectedValueOnce(
+          new NotFoundException(),
+        );
+        await expect(
+          service.confirmTicketPayment(1, 'user-1'),
+        ).rejects.toBeInstanceOf(NotFoundException);
+
+        ticketRepository.getTicketById.mockResolvedValue(makeTicket());
+        ticketRepository.updateTicket.mockRejectedValue(new Error('db'));
+        await expect(service.confirmTicketPayment(1, 'user-1')).rejects.toThrow(
+          'db',
+        );
+
+        expect(metrics.paymentConfirmed).not.toHaveBeenCalled();
+        expect(metrics.paymentRejected).not.toHaveBeenCalled();
+      });
+    });
+
     it('lança Conflict quando o ticket pertence a outro usuário', async () => {
       ticketRepository.getTicketById.mockResolvedValue(
         makeTicket({ user_id: 'other-user' }),

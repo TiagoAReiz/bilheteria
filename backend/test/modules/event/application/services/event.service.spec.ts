@@ -6,6 +6,10 @@ import {
   EVENT_REPOSITORY,
   type EventRepositoryPort,
 } from '../../../../../src/modules/event/application/ports/outbound/repositories/event.repository.port.js';
+import {
+  EVENT_METRICS,
+  type EventMetricsPort,
+} from '../../../../../src/modules/event/application/ports/outbound/metrics/event-metrics.port.js';
 import type { Event } from '../../../../../src/modules/event/core/entities/event.entity.js';
 import type { NewEvent } from '../../../../../src/modules/event/core/entities/new-event.entity.js';
 
@@ -26,6 +30,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
 describe('EventService', () => {
   let service: EventService;
   let eventRepository: MockPort<EventRepositoryPort>;
+  let metrics: MockPort<EventMetricsPort>;
 
   beforeEach(async () => {
     eventRepository = {
@@ -33,11 +38,13 @@ describe('EventService', () => {
       getUpcomingEvents: vi.fn(),
       getEventById: vi.fn(),
     };
+    metrics = { eventCreated: vi.fn() };
 
     const module = await Test.createTestingModule({
       providers: [
         EventService,
         { provide: EVENT_REPOSITORY, useValue: eventRepository },
+        { provide: EVENT_METRICS, useValue: metrics },
       ],
     }).compile();
 
@@ -57,6 +64,32 @@ describe('EventService', () => {
 
     await expect(service.createEvent(input)).resolves.toBe(created);
     expect(eventRepository.createWithTickets).toHaveBeenCalledWith(input);
+    expect(metrics.eventCreated).toHaveBeenCalledTimes(1);
+  });
+
+  it('createEvent não conta evento criado quando o repositório falha', async () => {
+    eventRepository.createWithTickets.mockRejectedValue(new Error('db'));
+
+    await expect(
+      service.createEvent({
+        name: 'Show',
+        location: 'Arena',
+        starts_at: new Date('2030-01-01T20:00:00Z'),
+        capacity: 10,
+        organizer_id: 'org-1',
+      }),
+    ).rejects.toThrow('db');
+    expect(metrics.eventCreated).not.toHaveBeenCalled();
+  });
+
+  it('leituras não geram métrica de evento criado', async () => {
+    eventRepository.getUpcomingEvents.mockResolvedValue([]);
+    eventRepository.getEventById.mockResolvedValue(makeEvent());
+
+    await service.listUpcomingEvents();
+    await service.getEventById(1);
+
+    expect(metrics.eventCreated).not.toHaveBeenCalled();
   });
 
   it('listUpcomingEvents delega para getUpcomingEvents', async () => {
