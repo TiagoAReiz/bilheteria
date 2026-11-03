@@ -5,7 +5,7 @@ export const SESSION_COOKIE_NAMES = [
   "__Secure-better-auth.session_token",
 ] as const;
 
-export const PRIVATE_PATHS = ["/profile", "/events/new", "/payment"] as const;
+export const PRIVATE_PATHS = ["/profile", "/events/new", "/payment", "/my-tickets"] as const;
 
 export const LOGIN_PATH = "/login";
 

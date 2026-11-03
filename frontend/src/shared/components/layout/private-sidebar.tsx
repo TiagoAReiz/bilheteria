@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarIcon, CalendarPlusIcon, LogOutIcon, UserIcon } from "lucide-react";
+import { CalendarIcon, CalendarPlusIcon, LogOutIcon, TicketIcon, UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
 import { useSession } from "@/shared/hooks/useSession";
@@ -11,6 +11,7 @@ import { cn } from "@/shared/lib/utils";
 
 const links = [
   { href: "/", label: "Eventos", icon: CalendarIcon },
+  { href: "/my-tickets", label: "Minhas reservas", icon: TicketIcon },
   { href: "/profile", label: "Meu perfil", icon: UserIcon },
   { href: "/events/new", label: "Criar evento", icon: CalendarPlusIcon },
 ];

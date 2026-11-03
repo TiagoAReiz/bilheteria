@@ -8,7 +8,7 @@ import {
 
 describe("auth-redirect (lógica do proxy)", () => {
   describe("isPrivatePath", () => {
-    it.each(["/profile", "/profile/x", "/events/new", "/payment/success", "/payment/failure"])("%s é privada", (p) => {
+    it.each(["/profile", "/profile/x", "/events/new", "/payment/success", "/payment/failure", "/my-tickets"])("%s é privada", (p) => {
       expect(isPrivatePath(p)).toBe(true);
     });
 
