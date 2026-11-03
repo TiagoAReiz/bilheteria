@@ -1,0 +1,36 @@
+# Armazenamento de imagens: S3 emulado pelo LocalStack (capa/galeria dos eventos e avatares).
+# Incluído pelo docker-compose.yaml da raiz (diretiva `include`). Detalhes no README da raiz,
+# seção "Armazenamento de imagens (S3 / LocalStack)".
+#
+# Versão FIXA 4.14.0 (fev/2026): é a última imagem community (semver) que sobe sem auth token.
+# A partir da 2026.03.0 o LocalStack virou uma imagem única que exige LOCALSTACK_AUTH_TOKEN
+# (conta; plano Hobby gratuito para uso não comercial). Não troque por `latest`/`stable`/`2026.x`:
+# elas não sobem sem o token.
+#
+# O bucket, o CORS e a política de leitura pública são criados pelo hook localstack/init-s3.sh
+# (roda a cada subida, idempotente). Sem volume: o LocalStack community não persiste estado, então
+# as imagens enviadas somem quando o container é recriado (só dev; as referências no banco ficam
+# apontando para objetos que não existem mais).
+# Trocar por S3/R2/MinIO de verdade é só mudar as variáveis STORAGE_* do backend.
+
+services:
+
+  localstack:
+    image: localstack/localstack:4.14.0
+    restart: unless-stopped
+    ports:
+      - 4566:4566     # endpoint S3: API (backend) e leitura/upload direto (navegador)
+    environment:
+      SERVICES: s3
+      # lidas pelo init-s3.sh
+      STORAGE_S3_BUCKET: bilheteria-images
+      STORAGE_CORS_ORIGINS: http://localhost:3001
+    volumes:
+      - ./localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh:ro
+    healthcheck:
+      # healthy só depois de os hooks do ready.d terminarem (bucket criado)
+      test: ["CMD-SHELL", "curl -fsS localhost:4566/_localstack/init/ready | grep -q '\"completed\": *true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s

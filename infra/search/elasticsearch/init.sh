@@ -44,4 +44,13 @@ put_json /_index_template/tickets "$DIR/index-templates/tickets.json"
 ensure_alias events events_v1
 ensure_alias tickets tickets_v1
 
+# campos NOVOS de um template também entram no índice que já existe (o template só vale para
+# índices criados depois). PUT _mapping só aceita adicionar campo; mudar um campo existente
+# continua exigindo reindexação (ver README da raiz). Idempotente.
+for file in "$DIR"/mapping-additions/*.json; do
+  [ -e "$file" ] || continue
+  alias="$(basename "$file" .json)"
+  put_json "/$alias/_mapping" "$file"
+done
+
 echo "Elasticsearch pronto para o Sequin"

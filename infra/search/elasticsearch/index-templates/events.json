@@ -1,7 +1,7 @@
 {
   "_meta": {
     "description": "Eventos para busca pública. Documento montado pela transform infra/search/sequin/transforms/event-document.exs",
-    "version": 1
+    "version": 2
   },
   "index_patterns": ["events_v*"],
   "composed_of": ["bilheteria-analysis"],
@@ -24,6 +24,7 @@
         "starts_at": { "type": "date" },
         "capacity": { "type": "integer" },
         "available_tickets": { "type": "integer" },
+        "cover_key": { "type": "keyword", "index": false, "doc_values": false },
         "organizer_id": { "type": "keyword" },
         "deleted": { "type": "boolean" }
       }
