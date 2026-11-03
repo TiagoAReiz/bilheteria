@@ -160,6 +160,7 @@ describe('ElasticsearchEventSearch', () => {
             starts_at: new Date('2026-07-01T20:00:00.000Z'),
             capacity: 100,
             available_tickets: 40,
+            cover_key: null,
           },
         ],
         total: 57,

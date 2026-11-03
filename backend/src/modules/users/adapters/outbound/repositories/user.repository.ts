@@ -29,6 +29,19 @@ export class UserRepository implements UserRepositoryPort {
         }
     }
 
+    async replaceAvatarKey(id: string, key: string | null): Promise<{previousKey: string | null; image: string | null}> {
+        // linha travada: duas trocas simultâneas não "perdem" a chave anterior (que ficaria órfã no bucket)
+        return await this.prisma.$transaction(async (tx) => {
+            const [user] = await tx.$queryRaw<{avatar_key: string | null; image: string | null}[]>`
+                SELECT avatar_key, image FROM users WHERE id = ${id} FOR UPDATE`;
+            if (!user) {
+                throw new NotFoundException(`O usuário ${id} não foi encontrado`);
+            }
+            await tx.user.update({where: {id}, data: {avatarKey: key}});
+            return {previousKey: user.avatar_key, image: user.image};
+        });
+    }
+
     async promoteToOrganizer(id: string): Promise<void> {
         // so promove USER: ADMIN nunca e rebaixado e ORGANIZER ja esta no lugar
         await this.prisma.user.updateMany({where: {id, role: Role.USER}, data: {role: Role.ORGANIZER}});

@@ -30,6 +30,13 @@ const TEST_ENV: Record<string, string> = {
   MP_WEBHOOK_SECRET: 'e2e-webhook-secret',
   MP_API_BASE_URL: 'http://127.0.0.1:1',
   MP_HTTP_TIMEOUT_MS: '1000',
+  // S3 numa porta fechada (o client não conecta ao subir) e uma base pública fixa para as URLs
+  STORAGE_S3_BUCKET: 'bilheteria-images',
+  STORAGE_S3_ENDPOINT: 'http://127.0.0.1:1',
+  STORAGE_S3_FORCE_PATH_STYLE: 'true',
+  STORAGE_S3_ACCESS_KEY_ID: 'test',
+  STORAGE_S3_SECRET_ACCESS_KEY: 'test',
+  STORAGE_PUBLIC_URL: 'http://cdn.e2e/bilheteria-images',
 };
 
 // assina como o Mercado Pago: HMAC-SHA256 de id:<data.id>;request-id:<x-request-id>;ts:<ts>;
@@ -50,6 +57,7 @@ const upcoming = {
   capacity: 10,
   price_cents: 5000,
   available_tickets: 10,
+  cover_key: 'events/1/cover/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png',
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00.000Z'),
   updated_at: new Date('2026-01-01T00:00:00.000Z'),
@@ -62,8 +70,24 @@ const createPrismaFake = () => ({
   $transaction: vi.fn(),
   event: {
     findMany: vi.fn().mockResolvedValue([upcoming]),
-    findFirst: vi.fn(async ({ where }: { where: { id: number } }) =>
-      where.id === upcoming.id ? upcoming : null,
+    findFirst: vi.fn(
+      async ({ where, include }: { where: { id: number }; include?: { photos?: unknown } }) => {
+        if (where.id !== upcoming.id) return null;
+        return include?.photos
+          ? {
+              ...upcoming,
+              photos: [
+                {
+                  id: 3,
+                  event_id: 1,
+                  key: 'events/1/photos/a.webp',
+                  position: 0,
+                  created_at: new Date('2026-01-01T00:00:00.000Z'),
+                },
+              ],
+            }
+          : upcoming;
+      },
     ),
     create: vi.fn(),
   },
@@ -127,8 +151,11 @@ describe('Bilheteria (e2e, sem banco)', () => {
           id: 1,
           name: 'Show',
           starts_at: '2099-01-01T20:00:00.000Z',
+          cover_url:
+            'http://cdn.e2e/bilheteria-images/events/1/cover/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png',
         }),
       ]);
+      expect(res.body[0]).not.toHaveProperty('cover_key');
       expect(prisma.event.findMany).toHaveBeenCalled();
     });
 
@@ -136,7 +163,30 @@ describe('Bilheteria (e2e, sem banco)', () => {
       const res = await request(app.getHttpServer())
         .get('/events/1')
         .expect(200);
-      expect(res.body).toMatchObject({ id: 1, name: 'Show' });
+      expect(res.body).toMatchObject({
+        id: 1,
+        name: 'Show',
+        cover_url:
+          'http://cdn.e2e/bilheteria-images/events/1/cover/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png',
+        photos: [
+          { id: 3, url: 'http://cdn.e2e/bilheteria-images/events/1/photos/a.webp', position: 0 },
+        ],
+      });
+    });
+
+    it.each([
+      ['post', '/events/1/cover/upload-url'],
+      ['put', '/events/1/cover'],
+      ['delete', '/events/1/cover'],
+      ['post', '/events/1/photos/upload-url'],
+      ['post', '/events/1/photos'],
+      ['patch', '/events/1/photos/order'],
+      ['delete', '/events/1/photos/3'],
+      ['post', '/users/me/avatar/upload-url'],
+      ['put', '/users/me/avatar'],
+      ['delete', '/users/me/avatar'],
+    ] as const)('%s %s exige sessão (401)', async (method, path) => {
+      await request(app.getHttpServer())[method](path).send({}).expect(401);
     });
 
     it('GET /events/:id retorna 404 quando não existe', async () => {

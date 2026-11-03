@@ -44,21 +44,42 @@ model event{
     // contador aproximado para a busca: recalculado em lote pelo job de disponibilidade
     // (o numero exato continua vindo do /status/:id, que conta os tickets)
     available_tickets Int @default(0)
+    // chave do objeto da capa no bucket (events/<id>/cover/<uuid>.<ext>). Só a chave: a URL
+    // pública é montada com STORAGE_PUBLIC_URL, então trocar de provedor não mexe no banco.
+    cover_key String?
     organizer_id String
     organizer user @relation(fields: [organizer_id], references: [id])
     tickets ticket[]
+    photos event_photo[]
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
     deleted_at DateTime?
 
     @@index([starts_at])
 }
+
+// Galeria do evento (até 10 fotos, limite garantido com a linha do evento travada).
+// `position` ordena a galeria; única por evento (reordenar passa por posições negativas).
+model event_photo {
+    id         Int      @id @default(autoincrement())
+    event_id   Int
+    event      event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+    // events/<id>/photos/<uuid>.<ext>; gerada pelo servidor, nunca pelo nome do arquivo do cliente
+    key        String   @unique
+    position   Int
+    created_at DateTime @default(now())
+
+    @@unique([event_id, position])
+}
 model user {
     id            String    @id
     name          String
     email         String    @unique
     emailVerified Boolean   @default(false) @map("email_verified")
+    // foto do provedor social (Google/Facebook); continua sendo a padrão até o usuário enviar a dele
     image         String?
+    // avatar enviado pelo usuário (users/<id>/avatar/<uuid>.<ext>); servido no lugar de `image`
+    avatarKey     String?   @map("avatar_key")
     role          Role      @default(USER)
     cpfHash       String?   @unique @map("cpf_hash")
     createdAt     DateTime  @default(now()) @map("created_at")

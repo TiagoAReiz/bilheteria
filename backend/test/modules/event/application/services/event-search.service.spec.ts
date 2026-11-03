@@ -10,6 +10,8 @@ import {
   type EventSearchPort,
 } from '../../../../../src/modules/event/application/ports/outbound/search/event-search.port.js';
 import type { EventSearchCriteria } from '../../../../../src/modules/event/core/entities/event-search.entity.js';
+import { IMAGE_STORAGE_SERVICE } from '../../../../../src/modules/storage/application/ports/inbound/services/image-storage.service.port.js';
+import { mockImageStorage, PUBLIC_BASE } from '../../../../utils/image-storage.js';
 
 const NOW = new Date('2026-06-15T12:00:00.000Z');
 const criteria: EventSearchCriteria = {
@@ -30,6 +32,7 @@ describe('EventSearchService', () => {
       providers: [
         EventSearchService,
         { provide: EVENT_SEARCH, useValue: eventSearch },
+        { provide: IMAGE_STORAGE_SERVICE, useValue: mockImageStorage() },
       ],
     }).compile();
     service = module.get(EventSearchService);
@@ -49,7 +52,7 @@ describe('EventSearchService', () => {
     };
     eventSearch.search.mockResolvedValue(result);
 
-    await expect(service.searchEvents(criteria)).resolves.toBe(result);
+    await expect(service.searchEvents(criteria)).resolves.toEqual(result);
     expect(eventSearch.search).toHaveBeenCalledWith(criteria, NOW);
   });
 
@@ -66,8 +69,45 @@ describe('EventSearchService', () => {
 
   it('aceita período de um único instante', async () => {
     const day = new Date('2026-08-01');
+    eventSearch.search.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      size: 12,
+      facets: { locations: [] },
+    });
     await service.searchEvents({ ...criteria, from: day, to: day });
     expect(eventSearch.search).toHaveBeenCalled();
+  });
+
+  it('troca a chave da capa do índice pela URL pública', async () => {
+    const hit = {
+      id: 1,
+      name: 'Show',
+      description: null,
+      location: 'Arena',
+      starts_at: NOW,
+      capacity: 10,
+      available_tickets: 5,
+    };
+    eventSearch.search.mockResolvedValue({
+      items: [
+        { ...hit, cover_key: 'events/1/cover/a.png' },
+        { ...hit, id: 2, cover_key: null },
+      ],
+      total: 2,
+      page: 1,
+      size: 12,
+      facets: { locations: [] },
+    });
+
+    const { items } = await service.searchEvents(criteria);
+
+    expect(items.map((item) => item.cover_url)).toEqual([
+      `${PUBLIC_BASE}/events/1/cover/a.png`,
+      null,
+    ]);
+    expect(items[0]).not.toHaveProperty('cover_key');
   });
 
   it('suggestEvents pede no máximo 8 sugestões', async () => {

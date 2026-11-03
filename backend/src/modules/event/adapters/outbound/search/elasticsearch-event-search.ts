@@ -7,7 +7,7 @@ import {EventSearchPort} from "../../../application/ports/outbound/search/event-
 import {
     EVENT_SEARCH_LIMITS,
     EventSearchCriteria,
-    EventSearchItem,
+    EventSearchHit,
     EventSearchResult,
     EventSuggestion,
     FacetBucket,
@@ -25,6 +25,9 @@ export interface EventDocument {
     starts_at: string;
     capacity: number;
     available_tickets: number;
+    // so a chave: a URL publica depende de STORAGE_PUBLIC_URL (a API monta)
+    // (ausente nos documentos indexados antes da capa existir)
+    cover_key?: string | null;
     organizer_id: string;
     deleted: boolean;
 }
@@ -42,7 +45,7 @@ export class ElasticsearchEventSearch implements EventSearchPort {
     constructor(@Inject(ELASTICSEARCH_CLIENT) private readonly client: Client) {
     }
 
-    async search(criteria: EventSearchCriteria, now: Date): Promise<EventSearchResult> {
+    async search(criteria: EventSearchCriteria, now: Date): Promise<EventSearchResult<EventSearchHit>> {
         const response = await withSearchAvailability(this.logger, () =>
             this.client.search<EventDocument, LocationAggregations>({
                 index: SEARCH_INDEX.events,
@@ -135,7 +138,7 @@ function searchFilters(criteria: EventSearchCriteria, now: Date): estypes.QueryD
     return filters;
 }
 
-function toSearchItem(source: EventDocument): EventSearchItem {
+function toSearchItem(source: EventDocument): EventSearchHit {
     return {
         id: source.id,
         name: source.name,
@@ -144,6 +147,8 @@ function toSearchItem(source: EventDocument): EventSearchItem {
         starts_at: new Date(source.starts_at),
         capacity: source.capacity,
         available_tickets: source.available_tickets,
+        // documentos indexados antes da capa existir nao tem o campo
+        cover_key: source.cover_key ?? null,
     };
 }
 

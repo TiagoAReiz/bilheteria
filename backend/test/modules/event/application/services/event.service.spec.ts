@@ -12,6 +12,8 @@ import {
 } from '../../../../../src/modules/event/application/ports/outbound/metrics/event-metrics.port.js';
 import type { Event } from '../../../../../src/modules/event/core/entities/event.entity.js';
 import type { NewEvent } from '../../../../../src/modules/event/core/entities/new-event.entity.js';
+import { IMAGE_STORAGE_SERVICE } from '../../../../../src/modules/storage/application/ports/inbound/services/image-storage.service.port.js';
+import { mockImageStorage, PUBLIC_BASE } from '../../../../utils/image-storage.js';
 
 const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   id: 1,
@@ -22,6 +24,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   capacity: 10,
   price_cents: 5000,
   available_tickets: 10,
+  cover_key: null,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00Z'),
   updated_at: new Date('2026-01-01T00:00:00Z'),
@@ -33,29 +36,33 @@ describe('EventService', () => {
   let service: EventService;
   let eventRepository: MockPort<EventRepositoryPort>;
   let metrics: MockPort<EventMetricsPort>;
+  let images: ReturnType<typeof mockImageStorage>;
 
   beforeEach(async () => {
     eventRepository = {
       createWithTickets: vi.fn(),
       getUpcomingEvents: vi.fn(),
       getEventById: vi.fn(),
+      getEventWithPhotos: vi.fn(),
       getEventIdsByOrganizer: vi.fn(),
       refreshAvailableTickets: vi.fn(),
     };
     metrics = { eventCreated: vi.fn() };
+    images = mockImageStorage();
 
     const module = await Test.createTestingModule({
       providers: [
         EventService,
         { provide: EVENT_REPOSITORY, useValue: eventRepository },
         { provide: EVENT_METRICS, useValue: metrics },
+        { provide: IMAGE_STORAGE_SERVICE, useValue: images },
       ],
     }).compile();
 
     service = module.get(EventService);
   });
 
-  it('createEvent delega para createWithTickets e retorna o evento criado', async () => {
+  it('createEvent delega para createWithTickets e retorna o evento criado (sem capa ainda)', async () => {
     const input: NewEvent = {
       name: 'Show',
       location: 'Arena',
@@ -67,7 +74,8 @@ describe('EventService', () => {
     const created = makeEvent();
     eventRepository.createWithTickets.mockResolvedValue(created);
 
-    await expect(service.createEvent(input)).resolves.toBe(created);
+    const { cover_key: _cover, ...rest } = created;
+    await expect(service.createEvent(input)).resolves.toEqual({ ...rest, cover_url: null });
     expect(eventRepository.createWithTickets).toHaveBeenCalledWith(input);
     expect(metrics.eventCreated).toHaveBeenCalledTimes(1);
   });
@@ -98,11 +106,16 @@ describe('EventService', () => {
     expect(metrics.eventCreated).not.toHaveBeenCalled();
   });
 
-  it('listUpcomingEvents delega para getUpcomingEvents', async () => {
-    const events = [makeEvent(), makeEvent({ id: 2 })];
+  it('listUpcomingEvents troca a chave da capa pela URL pública', async () => {
+    const events = [makeEvent(), makeEvent({ id: 2, cover_key: 'events/2/cover/a.png' })];
     eventRepository.getUpcomingEvents.mockResolvedValue(events);
 
-    await expect(service.listUpcomingEvents()).resolves.toBe(events);
+    const listed = await service.listUpcomingEvents();
+    expect(listed.map((e) => e.cover_url)).toEqual([
+      null,
+      `${PUBLIC_BASE}/events/2/cover/a.png`,
+    ]);
+    expect(listed[1]).not.toHaveProperty('cover_key');
     expect(eventRepository.getUpcomingEvents).toHaveBeenCalledTimes(1);
   });
 
@@ -130,5 +143,26 @@ describe('EventService', () => {
     expect(eventRepository.getEventIdsByOrganizer).toHaveBeenCalledWith(
       'org-1',
     );
+  });
+
+  it('getEventDetail monta capa e galeria (em ordem) com URLs públicas', async () => {
+    eventRepository.getEventWithPhotos.mockResolvedValue(
+      Object.assign(makeEvent({ id: 3, cover_key: 'events/3/cover/c.webp' }), {
+      photos: [
+        { id: 9, event_id: 3, key: 'events/3/photos/b.png', position: 1, created_at: new Date() },
+        { id: 7, event_id: 3, key: 'events/3/photos/a.jpg', position: 0, created_at: new Date() },
+      ],
+      }),
+    );
+
+    const detail = await service.getEventDetail(3);
+
+    expect(eventRepository.getEventWithPhotos).toHaveBeenCalledWith(3);
+    expect(detail.cover_url).toBe(`${PUBLIC_BASE}/events/3/cover/c.webp`);
+    expect(detail.photos).toEqual([
+      { id: 7, url: `${PUBLIC_BASE}/events/3/photos/a.jpg`, position: 0 },
+      { id: 9, url: `${PUBLIC_BASE}/events/3/photos/b.png`, position: 1 },
+    ]);
+    expect(detail).not.toHaveProperty('cover_key');
   });
 });

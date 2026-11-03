@@ -33,6 +33,7 @@ describe('TicketSearchService', () => {
       createEvent: vi.fn(),
       listUpcomingEvents: vi.fn(),
       getEventById: vi.fn(),
+      getEventDetail: vi.fn(),
       getEventIdsByOrganizer: vi.fn().mockResolvedValue([3, 8]),
     };
 

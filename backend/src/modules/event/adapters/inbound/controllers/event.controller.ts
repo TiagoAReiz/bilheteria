@@ -31,6 +31,6 @@ export class EventController {
   @AllowAnonymous()
   @Get(":id")
   getById(@Param("id", ParseIntPipe) id: number) {
-    return this.eventService.getEventById(id);
+    return this.eventService.getEventDetail(id);
   }
 }

@@ -10,7 +10,7 @@ import {
   type EventServicePort,
 } from '../../../../../../src/modules/event/application/ports/inbound/services/event.service.port.js';
 import type { CreateEventDto } from '../../../../../../src/modules/event/adapters/dto/create-event-dto.js';
-import type { Event } from '../../../../../../src/modules/event/core/entities/event.entity.js';
+import type { EventView } from '../../../../../../src/modules/event/core/entities/event-image.entity.js';
 import { Role } from '../../../../../../src/modules/users/core/entities/role.js';
 
 const PUBLIC_KEY = 'PUBLIC';
@@ -18,7 +18,7 @@ const ROLES_KEY = 'ROLES';
 
 const session = { user: { id: 'org-1' } } as unknown as UserSession;
 
-const event: Event = {
+const event: EventView = {
   id: 1,
   name: 'Show',
   description: 'desc',
@@ -27,6 +27,7 @@ const event: Event = {
   capacity: 10,
   price_cents: 5000,
   available_tickets: 10,
+  cover_url: null,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00Z'),
   updated_at: new Date('2026-01-01T00:00:00Z'),
@@ -43,6 +44,7 @@ describe('EventController', () => {
       createEvent: vi.fn(),
       listUpcomingEvents: vi.fn(),
       getEventById: vi.fn(),
+      getEventDetail: vi.fn(),
       getEventIdsByOrganizer: vi.fn(),
     };
 
@@ -121,10 +123,11 @@ describe('EventController', () => {
   });
 
   describe('getById', () => {
-    it('delega para getEventById com o id', async () => {
-      eventService.getEventById.mockResolvedValue(event);
-      await expect(controller.getById(1)).resolves.toBe(event);
-      expect(eventService.getEventById).toHaveBeenCalledWith(1);
+    it('delega para getEventDetail com o id (capa e galeria)', async () => {
+      const detail = { ...event, photos: [] };
+      eventService.getEventDetail.mockResolvedValue(detail);
+      await expect(controller.getById(1)).resolves.toBe(detail);
+      expect(eventService.getEventDetail).toHaveBeenCalledWith(1);
     });
 
     it('é pública e mapeada em GET /events/:id', () => {

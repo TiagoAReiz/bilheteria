@@ -2,6 +2,7 @@ import {Injectable, NotFoundException} from "@nestjs/common";
 import {PrismaService} from "../../../../prisma/prisma.service.js";
 import {Event} from "../../../core/entities/event.entity.js";
 import {NewEvent} from "../../../core/entities/new-event.entity.js";
+import {EventWithPhotos} from "../../../core/entities/event-image.entity.js";
 import {EventRepositoryPort} from "../../../application/ports/outbound/repositories/event.repository.port.js";
 
 @Injectable()
@@ -38,6 +39,17 @@ export class EventRepository implements EventRepositoryPort {
 
     async getEventById(id: number): Promise<Event> {
         const event = await this.prisma.event.findFirst({where: {id, deleted_at: null}});
+        if (event) {
+            return event;
+        }
+        throw new NotFoundException(`O evento ${id} não foi encontrado`);
+    }
+
+    async getEventWithPhotos(id: number): Promise<EventWithPhotos> {
+        const event = await this.prisma.event.findFirst({
+            where: {id, deleted_at: null},
+            include: {photos: {orderBy: {position: 'asc'}}},
+        });
         if (event) {
             return event;
         }
