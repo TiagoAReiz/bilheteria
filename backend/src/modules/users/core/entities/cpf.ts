@@ -1,28 +1,16 @@
+import {cpf as cpfValidator} from 'cpf-cnpj-validator';
+
 export class Cpf {
     private constructor(readonly value: string) {}
 
+    /** Normaliza (só dígitos) e valida com a cpf-cnpj-validator (tamanho, lista negra e dígitos verificadores). */
     static create(raw: string): Cpf | null {
         const digits = raw.replace(/\D/g, '');
-        return Cpf.isValid(digits) ? new Cpf(digits) : null;
+        return digits.length === 11 && cpfValidator.isValid(digits, true) ? new Cpf(digits) : null;
     }
 
     /** Padrão de mercado: só os 6 dígitos do meio aparecem (***.456.789-**). */
     get masked(): string {
         return `***.${this.value.slice(3, 6)}.${this.value.slice(6, 9)}-**`;
-    }
-
-    private static isValid(digits: string): boolean {
-        if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) {
-            return false;
-        }
-        const checkDigit = (length: number) => {
-            let sum = 0;
-            for (let i = 0; i < length; i++) {
-                sum += Number(digits[i]) * (length + 1 - i);
-            }
-            const rest = (sum * 10) % 11;
-            return rest === 10 ? 0 : rest;
-        };
-        return checkDigit(9) === Number(digits[9]) && checkDigit(10) === Number(digits[10]);
     }
 }

@@ -12,10 +12,15 @@ describe('CpfDto', () => {
     await expect(validateBody({ cpf })).resolves.toHaveLength(0);
   });
 
-  // o DTO so garante que e string: a validacao dos digitos fica no Cpf (core) / UserService
-  it('aceita qualquer string, inclusive CPF inválido', async () => {
-    await expect(validateBody({ cpf: '000' })).resolves.toHaveLength(0);
-  });
+  // a cpf-cnpj-validator barra o CPF já no DTO (400 com mensagem de validação)
+  it.each(['000', '52998224724', '11111111111', '123.456.789-00'])(
+    'rejeita CPF inválido: %s',
+    async (cpf) => {
+      const errors = await validateBody({ cpf });
+      expect(errors).toHaveLength(1);
+      expect(Object.values(errors[0].constraints ?? {})).toContain('CPF inválido');
+    },
+  );
 
   it('rejeita cpf ausente', async () => {
     const errors = await validateBody({});

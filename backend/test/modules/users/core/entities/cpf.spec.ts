@@ -7,8 +7,6 @@ describe('Cpf', () => {
       ['52998224725', '52998224725'],
       ['111.444.777-35', '11144477735'],
       ['11144477735', '11144477735'],
-      // primeiro dígito verificador cai no caso "resto 10 -> 0"
-      ['123.456.789-09', '12345678909'],
     ])('aceita %s', (raw, expected) => {
       const cpf = Cpf.create(raw);
       expect(cpf).not.toBeNull();
@@ -35,6 +33,11 @@ describe('Cpf', () => {
   });
 
   describe('CPFs inválidos', () => {
+    // lista negra da cpf-cnpj-validator: o clássico CPF de exemplo é recusado mesmo com DVs corretos
+    it('rejeita 123.456.789-09', () => {
+      expect(Cpf.create('123.456.789-09')).toBeNull();
+    });
+
     it.each(['529.982.247-24', '529.982.247-15', '52998224735'])(
       'rejeita dígito verificador errado: %s',
       (raw) => {

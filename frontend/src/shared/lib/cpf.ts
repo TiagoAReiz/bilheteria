@@ -1,3 +1,5 @@
+import { cpf as cpfValidator } from "cpf-cnpj-validator";
+
 export function onlyDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
@@ -11,17 +13,10 @@ export function maskCpf(value: string): string {
     .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
 }
 
-/** Mesma regra de dígitos verificadores usada pelo backend. */
+/** Mesma validação do backend: cpf-cnpj-validator (tamanho, lista negra e dígitos verificadores). */
 export function isValidCpf(value: string): boolean {
   const digits = onlyDigits(value);
-  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
-  const checkDigit = (length: number) => {
-    let sum = 0;
-    for (let i = 0; i < length; i++) sum += Number(digits[i]) * (length + 1 - i);
-    const rest = (sum * 10) % 11;
-    return rest === 10 ? 0 : rest;
-  };
-  return checkDigit(9) === Number(digits[9]) && checkDigit(10) === Number(digits[10]);
+  return digits.length === 11 && cpfValidator.isValid(digits, true);
 }
 
 /** Exibição no padrão de mercado (LGPD): só os 6 dígitos do meio, ex. ***.982.247-**. */
