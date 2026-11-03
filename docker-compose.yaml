@@ -9,3 +9,119 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+
+  # ---------------------------------------------------------------------------
+  # Observabilidade (Grafana LGTM). Configs em infra/. Fluxo:
+  #   backend --OTLP--> alloy --> prometheus (métricas) / loki (logs) / tempo (traces) --> grafana
+  #   postgres-exporter <--scrape-- prometheus
+  # ---------------------------------------------------------------------------
+
+  # coletor único: recebe OTLP do backend e distribui para Prometheus, Loki e Tempo
+  alloy:
+    image: grafana/alloy:v1.21.3
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    ports:
+      - 4317:4317     # OTLP gRPC
+      - 4318:4318     # OTLP HTTP (usado pelo backend)
+      - 12345:12345   # UI de debug do Alloy (grafo de componentes)
+    volumes:
+      - ./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      # recebe as métricas do Alloy e as span metrics do Tempo via remote_write
+      - --web.enable-remote-write-receiver
+      # guarda os exemplars (trace_id) que ligam um ponto do gráfico ao trace no Tempo
+      - --enable-feature=exemplar-storage
+    ports:
+      - 9090:9090
+    volumes:
+      - ./infra/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+
+  loki:
+    image: grafana/loki:3.7.9
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki.yaml
+    ports:
+      - 3100:3100
+    volumes:
+      - ./infra/loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+
+  # a imagem do Tempo roda como usuário 10001 e o volume nasce do root: ajusta o dono uma vez
+  tempo-init:
+    image: grafana/tempo:2.10.10
+    user: root
+    entrypoint: ["chown", "10001:10001", "/var/tempo"]
+    volumes:
+      - tempo-data:/var/tempo
+
+  tempo:
+    image: grafana/tempo:2.10.10
+    restart: unless-stopped
+    command: -config.file=/etc/tempo/tempo.yaml
+    ports:
+      - 3200:3200     # API (Grafana consulta aqui); OTLP 4317/4318 só na rede interna, vindo do Alloy
+    volumes:
+      - ./infra/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    depends_on:
+      tempo-init:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started   # recebe as span metrics / service graph
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.20.1
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: db:5432/postgres?sslmode=disable
+      DATA_SOURCE_USER: postgres
+      DATA_SOURCE_PASS: postgres
+    ports:
+      - 9187:9187
+    depends_on:
+      - db
+
+  grafana:
+    image: grafana/grafana:12.4.14
+    restart: unless-stopped
+    ports:
+      - 3002:3000     # 3000 é a API e 3001 o front
+    environment:
+      # SÓ PARA DEV: login admin/admin. Fora da máquina local, use segredo de verdade
+      # (GF_SECURITY_ADMIN_PASSWORD__FILE) ou SSO.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+volumes:
+  alloy-data:
+  prometheus-data:
+  loki-data:
+  tempo-data:
+  grafana-data:

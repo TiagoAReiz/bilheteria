@@ -1,0 +1,14 @@
+# Carrega os *.json desta pasta na pasta "Bilheteria" do Grafana.
+# Os arquivos são a fonte da verdade: edite o JSON (ou exporte do Grafana e substitua aqui);
+# mudanças feitas só pela UI não podem ser salvas por cima do arquivo.
+apiVersion: 1
+
+providers:
+  - name: bilheteria
+    folder: Bilheteria
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards

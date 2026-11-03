@@ -1,0 +1,86 @@
+# Testes unitários das regras de alerta, com séries sintéticas (não precisa de Prometheus rodando):
+#   docker run --rm -v ./infra/prometheus:/p -w /p --entrypoint promtool prom/prometheus:v3.15.1 test rules alerts.test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # 6 de cada 306 req/min com 500 (~2%) -> dispara; 1 de cada 301 (~0,3%) -> não
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="bilheteria-backend", http_route="/reservation", http_response_status_code="500"}'
+        values: "0+6x20"
+      - series: 'http_server_request_duration_seconds_count{job="bilheteria-backend", http_route="/reservation", http_response_status_code="201"}'
+        values: "0+300x20"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BilheteriaHttp5xxAlto
+        exp_alerts: [] # ainda no "for: 2m"
+      - eval_time: 10m
+        alertname: BilheteriaHttp5xxAlto
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "Mais de 1% das requisições com 5xx nos últimos 5 minutos"
+              description: "Taxa de 5xx em 1.961%. Veja o dashboard Bilheteria / API (RED) e os logs de nível error."
+
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="bilheteria-backend", http_route="/events", http_response_status_code="500"}'
+        values: "0+1x20"
+      - series: 'http_server_request_duration_seconds_count{job="bilheteria-backend", http_route="/events", http_response_status_code="200"}'
+        values: "0+300x20"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BilheteriaHttp5xxAlto
+        exp_alerts: []
+
+  # metade das reservas entre 500ms e 1s -> p95 ~950ms
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{job="bilheteria-backend", http_request_method="POST", http_route="/reservation", le="0.25"}'
+        values: "0+10x20"
+      - series: 'http_server_request_duration_seconds_bucket{job="bilheteria-backend", http_request_method="POST", http_route="/reservation", le="0.5"}'
+        values: "0+50x20"
+      - series: 'http_server_request_duration_seconds_bucket{job="bilheteria-backend", http_request_method="POST", http_route="/reservation", le="1"}'
+        values: "0+100x20"
+      - series: 'http_server_request_duration_seconds_bucket{job="bilheteria-backend", http_request_method="POST", http_route="/reservation", le="+Inf"}'
+        values: "0+100x20"
+      # rota lenta que não é a reserva não conta
+      - series: 'http_server_request_duration_seconds_bucket{job="bilheteria-backend", http_request_method="GET", http_route="/events", le="+Inf"}'
+        values: "0+100x20"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BilheteriaReservaLenta
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "p95 do POST /reservation acima de 500ms"
+              description: "p95 em 950ms. Abra um exemplar no painel de span metrics para ver um trace lento."
+
+  - interval: 1m
+    input_series:
+      - series: 'pg_stat_database_numbackends{instance="postgres-exporter:9187", datname="postgres"}'
+        values: "85x10"
+      - series: 'pg_stat_database_numbackends{instance="postgres-exporter:9187", datname="template1"}'
+        values: "0x10"
+      - series: 'pg_settings_max_connections{instance="postgres-exporter:9187"}'
+        values: "100x10"
+      - series: 'pg_up{instance="postgres-exporter:9187"}'
+        values: "1x10"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PostgresConexoesPertoDoLimite
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: postgres-exporter:9187
+            exp_annotations:
+              summary: "Postgres usando mais de 80% de max_connections"
+              description: "85% das conexões em uso em postgres-exporter:9187."
+      - eval_time: 6m
+        alertname: PostgresExporterSemBanco
+        exp_alerts: []

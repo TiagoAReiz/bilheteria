@@ -1,0 +1,37 @@
+# Prometheus: armazena as métricas.
+# Entra: remote_write do Alloy (métricas do backend) e do Tempo (span metrics / service graph, com exemplars)
+#        e scrape dos alvos abaixo. Sai: PromQL para o Grafana e avaliação das regras de alerta.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# Sem Alertmanager: os alertas aparecem em http://localhost:9090/alerts e no Grafana
+# (Alerting > Alert rules, como regras do data source Prometheus), mas não notificam ninguém.
+# Para notificar (Slack, e-mail...): suba um Alertmanager com os receivers configurados
+# no alertmanager.yml dele e descomente:
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  # a própria stack: para saber se o pipeline de telemetria está saudável
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: alloy
+    static_configs:
+      - targets: ["alloy:12345"]
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+  - job_name: tempo
+    static_configs:
+      - targets: ["tempo:3200"]

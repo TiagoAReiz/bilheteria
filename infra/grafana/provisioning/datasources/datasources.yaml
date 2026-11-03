@@ -1,0 +1,81 @@
+# Datasources com UID fixo (os dashboards referenciam por UID) e correlação entre os sinais:
+#   métricas -> trace : exemplars do Prometheus abrem o trace no Tempo
+#   trace    -> logs  : botão "Logs for this span" no Tempo consulta o Loki pelo trace_id
+#   logs     -> trace : campo derivado do Loki transforma o trace_id da linha em link para o Tempo
+#   trace    -> métricas / service graph : Tempo lê span metrics e service graph do Prometheus
+# Atenção: neste arquivo "$" é interpolação de variável de ambiente; "$$" vira um "$" literal.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      # exemplars: label que guarda o trace id -> datasource de traces
+      exemplarTraceIdDestinations:
+        - name: traceID     # span metrics do Tempo
+          datasourceUid: tempo
+        - name: trace_id    # padrão OTel (caso o SDK passe a emitir exemplars)
+          datasourceUid: tempo
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        # logs via OTLP trazem trace_id como structured metadata (não no texto da linha)
+        - name: TraceID
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: "$${__value.raw}"
+          urlDisplayLabel: Abrir trace no Tempo
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+        tags:
+          - key: service.name
+            value: service_name
+        # o trace_id está no structured metadata do Loki, então filtra por ele (e não por texto na linha)
+        customQuery: true
+        query: '{$${__tags}} | trace_id="$${__trace.traceId}"'
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+        tags:
+          - key: service.name
+            value: service
+        queries:
+          - name: Latência p95 do span
+            query: 'histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{$$__tags, span_name="$${__span.name}"}[5m])))'
+          - name: Taxa de requisições do span
+            query: 'sum(rate(traces_spanmetrics_calls_total{$$__tags, span_name="$${__span.name}"}[5m]))'
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+      lokiSearch:
+        datasourceUid: loki
+      traceQuery:
+        timeShiftEnabled: true
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"

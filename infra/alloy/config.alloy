@@ -1,0 +1,80 @@
+// Grafana Alloy: coletor único da stack.
+// Entra: OTLP (traces, métricas e logs) do backend em :4317 (gRPC) e :4318 (HTTP).
+// Sai:   métricas -> Prometheus (remote_write), logs -> Loki (OTLP), traces -> Tempo (OTLP).
+// UI de debug com o grafo destes componentes: http://localhost:12345
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    metrics = [otelcol.processor.memory_limiter.default.input]
+    logs    = [otelcol.processor.memory_limiter.default.input]
+    traces  = [otelcol.processor.memory_limiter.default.input]
+  }
+}
+
+// recusa dados (o SDK do backend reenvia) antes de o Alloy estourar a memória
+otelcol.processor.memory_limiter "default" {
+  check_interval         = "1s"
+  limit_percentage       = 80
+  spike_limit_percentage = 20
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+// agrupa em lotes: menos requisições para os backends
+otelcol.processor.batch "default" {
+  output {
+    metrics = [otelcol.exporter.prometheus.default.input]
+    logs    = [otelcol.exporter.otlphttp.loki.input]
+    traces  = [otelcol.exporter.otlphttp.tempo.input]
+  }
+}
+
+// --- métricas ---------------------------------------------------------------
+// Converte OTLP para o modelo do Prometheus:
+//   http.server.request.duration (s) -> http_server_request_duration_seconds_{bucket,sum,count}
+//   bilheteria.reservations          -> bilheteria_reservations_total
+//   atributos: pontos viram _ (http.route -> http_route)
+//   service.name -> label job, service.instance.id -> label instance; o resto do resource vai para target_info
+otelcol.exporter.prometheus "default" {
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+  endpoint {
+    url            = "http://prometheus:9090/api/v1/write"
+    send_exemplars = true
+  }
+}
+
+// --- logs -------------------------------------------------------------------
+// Loki 3 recebe OTLP nativo em /otlp/v1/logs. service.name vira o label service_name;
+// trace_id, span_id, severity_text e os campos do pino viram structured metadata.
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100/otlp"
+  }
+}
+
+// --- traces -----------------------------------------------------------------
+otelcol.exporter.otlphttp "tempo" {
+  client {
+    endpoint = "http://tempo:4318"
+  }
+}

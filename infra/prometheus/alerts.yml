@@ -1,0 +1,52 @@
+# Regras de alerta avaliadas pelo Prometheus (ver prometheus.yml sobre notificação).
+# As métricas HTTP vêm do OpenTelemetry do backend (http.server.request.duration, em segundos).
+groups:
+  - name: bilheteria-api
+    rules:
+      - alert: BilheteriaHttp5xxAlto
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="bilheteria-backend", http_response_status_code=~"5.."}[5m]))
+            /
+          sum(rate(http_server_request_duration_seconds_count{job="bilheteria-backend"}[5m]))
+            > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mais de 1% das requisições com 5xx nos últimos 5 minutos"
+          description: "Taxa de 5xx em {{ $value | humanizePercentage }}. Veja o dashboard Bilheteria / API (RED) e os logs de nível error."
+
+      - alert: BilheteriaReservaLenta
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_server_request_duration_seconds_bucket{job="bilheteria-backend", http_request_method="POST", http_route="/reservation"}[5m]))
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 do POST /reservation acima de 500ms"
+          description: "p95 em {{ $value | humanizeDuration }}. Abra um exemplar no painel de span metrics para ver um trace lento."
+
+  - name: postgres
+    rules:
+      - alert: PostgresConexoesPertoDoLimite
+        expr: |
+          sum by (instance) (pg_stat_database_numbackends)
+            /
+          max by (instance) (pg_settings_max_connections)
+            > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Postgres usando mais de 80% de max_connections"
+          description: "{{ $value | humanizePercentage }} das conexões em uso em {{ $labels.instance }}."
+
+      - alert: PostgresExporterSemBanco
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "postgres-exporter não consegue conectar no Postgres"

@@ -15,3 +15,6 @@ node_modules/
 
 # configurações locais do Claude Code
 .claude/settings.local.json
+
+# worktrees temporárias de agentes
+.claude/worktrees/
