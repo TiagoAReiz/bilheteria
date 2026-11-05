@@ -59,8 +59,8 @@ Interface do TypeScript não existe em runtime, então cada porta exporta um tok
 export const USER_SERVICE = Symbol('USER_SERVICE');
 
 export interface UserServicePort {
-    registerCpf(userId: string, rawCpf: string): Promise<void>;
-    hasCpf(userId: string): Promise<boolean>;
+  registerCpf(userId: string, rawCpf: string): Promise<void>;
+  hasCpf(userId: string): Promise<boolean>;
 }
 ```
 
@@ -104,14 +104,14 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 - **CPF**: guardado em `users.cpf_hash` como HMAC-SHA256 com `CPF_HASH_SECRET` (determinístico para garantir CPF único por conta). Cadastrado uma única vez via `PATCH /users/me/cpf` e nunca alterado; não sai na sessão.
 - **Avatar**: `users.image` continua sendo a foto do Google/Facebook (Better Auth). O avatar enviado fica em `users.avatar_key` (campo do Better Auth com `input: false`: o `/api/auth/update-user` recusa com `FIELD_NOT_ALLOWED`). O plugin `customSession` acrescenta `avatarUrl` (enviado ?? `image`) ao `user` da sessão: o front lê de `/api/auth/get-session` e o `GET /users/me` devolve o mesmo. Upload: ver [Armazenamento de imagens](#armazenamento-de-imagens).
 
-| Método | Rota | Auth | Descrição |
-| --- | --- | --- | --- |
-| GET | `/users/me` | sim | usuário da sessão (com `avatarUrl` e `avatarKey`) + `hasCpf` (só o booleano; o hash nunca sai) |
-| PATCH | `/users/me/cpf` | sim | cadastra o CPF (uma vez) |
-| PATCH | `/users/me/organizer` | sim | vira `ORGANIZER` (sem restrições por enquanto) |
-| POST | `/users/me/avatar/upload-url` | sim | `{ content_type }` → POST pré-assinado `{ url, fields, key, max_bytes, expires_at }` |
-| PUT | `/users/me/avatar` | sim | `{ key }` confere no bucket, troca o avatar e apaga o anterior → `{ avatar_url }` |
-| DELETE | `/users/me/avatar` | sim | volta para a foto do provedor → `{ avatar_url }` (null = sem foto) |
+| Método | Rota                          | Auth | Descrição                                                                                      |
+| ------ | ----------------------------- | ---- | ---------------------------------------------------------------------------------------------- |
+| GET    | `/users/me`                   | sim  | usuário da sessão (com `avatarUrl` e `avatarKey`) + `hasCpf` (só o booleano; o hash nunca sai) |
+| PATCH  | `/users/me/cpf`               | sim  | cadastra o CPF (uma vez)                                                                       |
+| PATCH  | `/users/me/organizer`         | sim  | vira `ORGANIZER` (sem restrições por enquanto)                                                 |
+| POST   | `/users/me/avatar/upload-url` | sim  | `{ content_type }` → POST pré-assinado `{ url, fields, key, max_bytes, expires_at }`           |
+| PUT    | `/users/me/avatar`            | sim  | `{ key }` confere no bucket, troca o avatar e apaga o anterior → `{ avatar_url }`              |
+| DELETE | `/users/me/avatar`            | sim  | volta para a foto do provedor → `{ avatar_url }` (null = sem foto)                             |
 
 ### event
 
@@ -124,19 +124,19 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 
 - **Imagens**: uma capa (`event.cover_key`) e uma galeria de até 10 fotos (`event_photo`, ordenadas por `position`). Só o organizador que criou o evento ou um `ADMIN` mexem (403 para os demais, 404 para evento inexistente/excluído). As respostas trazem `cover_url` (e `photos` no detalhe), nunca a chave. Fluxo e regras em [Armazenamento de imagens](#armazenamento-de-imagens).
 
-| Método | Rota | Auth | Descrição |
-| --- | --- | --- | --- |
-| POST | `/events` | `ORGANIZER`/`ADMIN` | `{ name, description?, location, starts_at, capacity, price_cents, max_tickets_per_cpf }` |
-| PATCH | `/events/:id` | dono do evento ou `ADMIN` | edita `{ name?, description?, location?, starts_at?, capacity?, price_cents?, max_tickets_per_cpf? }` (só os enviados mudam; `description: null` apaga) |
-| GET | `/events` | não | próximos eventos (com `cover_url`) |
-| GET | `/events/:id` | não | detalhe do evento com `cover_url` e `photos: [{ id, url, position }]` em ordem |
-| POST | `/events/:id/cover/upload-url` | dono/`ADMIN` | `{ content_type }` → POST pré-assinado |
-| PUT | `/events/:id/cover` | dono/`ADMIN` | `{ key }` confirma e troca a capa (apaga a anterior) → `{ cover_url }` |
-| DELETE | `/events/:id/cover` | dono/`ADMIN` | remove a capa (204) |
-| POST | `/events/:id/photos/upload-url` | dono/`ADMIN` | `{ content_type }` → POST pré-assinado; 409 se a galeria já tem 10 |
-| POST | `/events/:id/photos` | dono/`ADMIN` | `{ key }` confirma e adiciona no fim → `{ photos }`; 409 se lotou |
-| PATCH | `/events/:id/photos/order` | dono/`ADMIN` | `{ photo_ids }` (todas as fotos, na nova ordem) → `{ photos }`; 400 se não for exatamente a galeria |
-| DELETE | `/events/:id/photos/:photoId` | dono/`ADMIN` | remove a foto e o objeto (204) |
+| Método | Rota                            | Auth                      | Descrição                                                                                                                                               |
+| ------ | ------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/events`                       | `ORGANIZER`/`ADMIN`       | `{ name, description?, location, starts_at, capacity, price_cents, max_tickets_per_cpf }`                                                               |
+| PATCH  | `/events/:id`                   | dono do evento ou `ADMIN` | edita `{ name?, description?, location?, starts_at?, capacity?, price_cents?, max_tickets_per_cpf? }` (só os enviados mudam; `description: null` apaga) |
+| GET    | `/events`                       | não                       | próximos eventos (com `cover_url`)                                                                                                                      |
+| GET    | `/events/:id`                   | não                       | detalhe do evento com `cover_url` e `photos: [{ id, url, position }]` em ordem                                                                          |
+| POST   | `/events/:id/cover/upload-url`  | dono/`ADMIN`              | `{ content_type }` → POST pré-assinado                                                                                                                  |
+| PUT    | `/events/:id/cover`             | dono/`ADMIN`              | `{ key }` confirma e troca a capa (apaga a anterior) → `{ cover_url }`                                                                                  |
+| DELETE | `/events/:id/cover`             | dono/`ADMIN`              | remove a capa (204)                                                                                                                                     |
+| POST   | `/events/:id/photos/upload-url` | dono/`ADMIN`              | `{ content_type }` → POST pré-assinado; 409 se a galeria já tem 10                                                                                      |
+| POST   | `/events/:id/photos`            | dono/`ADMIN`              | `{ key }` confirma e adiciona no fim → `{ photos }`; 409 se lotou                                                                                       |
+| PATCH  | `/events/:id/photos/order`      | dono/`ADMIN`              | `{ photo_ids }` (todas as fotos, na nova ordem) → `{ photos }`; 400 se não for exatamente a galeria                                                     |
+| DELETE | `/events/:id/photos/:photoId`   | dono/`ADMIN`              | remove a foto e o objeto (204)                                                                                                                          |
 
 ### ticket
 
@@ -147,10 +147,10 @@ Para usar um módulo dentro de outro (ex.: `ticket` usando `users`), importe o m
 - Reserva expira em 5 minutos sem pagamento; depois disso o ingresso volta a ficar disponível.
 - Constantes da regra em `ticket/core/entities/reservation.entity.ts`.
 
-| Método | Rota | Auth | Descrição |
-| --- | --- | --- | --- |
-| GET | `/status/:id` | não | total / disponíveis / reservados do evento |
-| POST | `/reservation` | sim | `{ event_id }` reserva um ingresso |
+| Método | Rota           | Auth | Descrição                                  |
+| ------ | -------------- | ---- | ------------------------------------------ |
+| GET    | `/status/:id`  | não  | total / disponíveis / reservados do evento |
+| POST   | `/reservation` | sim  | `{ event_id }` reserva um ingresso         |
 
 Dependências entre módulos: `ticket` usa as portas inbound de `users` (`USER_SERVICE`) e `event` (`EVENT_SERVICE`).
 
@@ -183,22 +183,22 @@ Pagamento do ingresso com o **Checkout Pro do Mercado Pago, pela API de Orders**
 
 Peças no código (mesmo padrão hexagonal dos outros módulos):
 
-| Peça | Arquivo | Papel |
-| --- | --- | --- |
-| regras | `core/entities/payment-rules.ts` | funções puras: pode abrir checkout? reaproveita? confirma ou estorna? |
-| `PAYMENT_SERVICE` | `application/services/payment.service.ts` | casos de uso; não conhece o Mercado Pago |
-| `PAYMENT_GATEWAY` | `adapters/outbound/gateways/mercadopago.gateway.ts` | API de Orders com `fetch` nativo (criar, consultar, estornar) |
-| `PAYMENT_REPOSITORY` | `adapters/outbound/repositories/payment.repository.ts` | transações com `SELECT ... FOR UPDATE` |
-| `PAYMENT_METRICS` | `adapters/outbound/metrics/otel-payment-metrics.ts` | métricas de negócio (ver [Métricas de negócio](#métricas-de-negócio)) |
-| assinatura | `adapters/inbound/webhooks/mercadopago-signature{,.guard}.ts` | valida o `x-signature` antes de qualquer outra coisa |
+| Peça                 | Arquivo                                                       | Papel                                                                 |
+| -------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| regras               | `core/entities/payment-rules.ts`                              | funções puras: pode abrir checkout? reaproveita? confirma ou estorna? |
+| `PAYMENT_SERVICE`    | `application/services/payment.service.ts`                     | casos de uso; não conhece o Mercado Pago                              |
+| `PAYMENT_GATEWAY`    | `adapters/outbound/gateways/mercadopago.gateway.ts`           | API de Orders com `fetch` nativo (criar, consultar, estornar)         |
+| `PAYMENT_REPOSITORY` | `adapters/outbound/repositories/payment.repository.ts`        | transações com `SELECT ... FOR UPDATE`                                |
+| `PAYMENT_METRICS`    | `adapters/outbound/metrics/otel-payment-metrics.ts`           | métricas de negócio (ver [Métricas de negócio](#métricas-de-negócio)) |
+| assinatura           | `adapters/inbound/webhooks/mercadopago-signature{,.guard}.ts` | valida o `x-signature` antes de qualquer outra coisa                  |
 
 O módulo não importa `ticket` nem `event`: o repositório lê e atualiza `ticket`/`event` dentro da própria transação (é o único jeito de marcar o ticket pago e o pagamento aprovado atomicamente sem uma abstração de unit of work), usando a regra de TTL do `ticket/core`.
 
-| Método | Rota | Auth | Descrição |
-| --- | --- | --- | --- |
-| POST | `/payments/checkout` | sim | `{ ticket_id }` → `{ payment_id, checkout_url, expires_at }` |
-| GET | `/payments/:id` | sim (dono) | `{ id, ticket_id, status, amount_cents, currency, expires_at, checkout_url, created_at, updated_at }`; de outra pessoa = 404 |
-| POST | `/webhooks/mercadopago` | assinatura | notificação do Mercado Pago (evento "Order (Mercado Pago)") |
+| Método | Rota                    | Auth       | Descrição                                                                                                                    |
+| ------ | ----------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/payments/checkout`    | sim        | `{ ticket_id }` → `{ payment_id, checkout_url, expires_at }`                                                                 |
+| GET    | `/payments/:id`         | sim (dono) | `{ id, ticket_id, status, amount_cents, currency, expires_at, checkout_url, created_at, updated_at }`; de outra pessoa = 404 |
+| POST   | `/webhooks/mercadopago` | assinatura | notificação do Mercado Pago (evento "Order (Mercado Pago)")                                                                  |
 
 **Checkout** (`POST /payments/checkout`)
 
@@ -227,16 +227,16 @@ A reserva continua expirando em 5 minutos sem pagamento (regra do módulo ticket
 
 #### Variáveis do pagamento
 
-| Variável | Padrão | Uso |
-| --- | --- | --- |
-| `MP_ACCESS_TOKEN` | — | access token da aplicação (em dev, o de **teste**). Vazio: a API sobe e os pagamentos respondem 502 |
-| `MP_WEBHOOK_SECRET` | — | assinatura secreta do webhook, gerada no painel ao cadastrar a URL. Vazio: webhook sempre 401 |
-| `MP_NOTIFICATION_URL` | — | só referência: a URL a cadastrar no painel (`https://<túnel>/webhooks/mercadopago`). A API de Orders do Checkout Pro não tem URL de notificação por pedido |
-| `MP_WEBHOOK_TOLERANCE_SECONDS` | `300` | tolerância do `ts` da assinatura |
-| `MP_HTTP_TIMEOUT_MS` | `5000` | timeout por chamada ao Mercado Pago (1 a 15000; valor inválido impede a API de subir) |
-| `MP_API_BASE_URL` | `https://api.mercadopago.com` | só para testes |
-| `MP_PUBLIC_KEY` | — | não usada (o Checkout Pro redireciona; não há SDK JS no front) |
-| `FRONTEND_URL` | — | base das URLs de retorno do checkout |
+| Variável                       | Padrão                        | Uso                                                                                                                                                        |
+| ------------------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MP_ACCESS_TOKEN`              | —                             | access token da aplicação (em dev, o de **teste**). Vazio: a API sobe e os pagamentos respondem 502                                                        |
+| `MP_WEBHOOK_SECRET`            | —                             | assinatura secreta do webhook, gerada no painel ao cadastrar a URL. Vazio: webhook sempre 401                                                              |
+| `MP_NOTIFICATION_URL`          | —                             | só referência: a URL a cadastrar no painel (`https://<túnel>/webhooks/mercadopago`). A API de Orders do Checkout Pro não tem URL de notificação por pedido |
+| `MP_WEBHOOK_TOLERANCE_SECONDS` | `300`                         | tolerância do `ts` da assinatura                                                                                                                           |
+| `MP_HTTP_TIMEOUT_MS`           | `5000`                        | timeout por chamada ao Mercado Pago (1 a 15000; valor inválido impede a API de subir)                                                                      |
+| `MP_API_BASE_URL`              | `https://api.mercadopago.com` | só para testes                                                                                                                                             |
+| `MP_PUBLIC_KEY`                | —                             | não usada (o Checkout Pro redireciona; não há SDK JS no front)                                                                                             |
+| `FRONTEND_URL`                 | —                             | base das URLs de retorno do checkout                                                                                                                       |
 
 #### Testando no ambiente de teste do Mercado Pago
 
@@ -248,7 +248,6 @@ A reserva continua expirando em 5 minutos sem pagamento (regra do módulo ticket
 6. Estorno: reserve, abra o checkout e pague depois que o contador zerar (se o Mercado Pago ainda deixar) ou reserve de novo o mesmo ingresso com outra conta antes de o webhook chegar. O pagamento vira `refunded` e conta em `bilheteria_payments_refunded_total`.
 
 A documentação do Mercado Pago avisa que pagamentos de teste podem não disparar notificações para a URL cadastrada; nesse caso a tela de retorno fica em "Aguardando a confirmação" e dá para validar o webhook pelo "Simular notificação".
-
 
 ## Busca (Elasticsearch)
 
@@ -284,11 +283,11 @@ Mesmas regras de dependência do resto: o service conhece só a porta `EVENT_SEA
 
 ### Endpoints
 
-| Método | Rota | Auth | Descrição |
-| --- | --- | --- | --- |
-| GET | `/events/search?q=&location=&from=&to=&available=true&page=&size=` | não | busca textual + filtros; `{ items, total, page, size, facets: { locations: [{ value, count }] } }` |
-| GET | `/events/suggest?q=` | não | autocomplete, até 8 `{ id, name, location, starts_at }` |
-| GET | `/tickets/search?event_id=&status=&page=&size=` | `ADMIN`/`ORGANIZER` | ingressos: `{ items: [{ id, event_id, user_id, status, reserved_at, is_paid }], total, page, size }` |
+| Método | Rota                                                               | Auth                | Descrição                                                                                            |
+| ------ | ------------------------------------------------------------------ | ------------------- | ---------------------------------------------------------------------------------------------------- |
+| GET    | `/events/search?q=&location=&from=&to=&available=true&page=&size=` | não                 | busca textual + filtros; `{ items, total, page, size, facets: { locations: [{ value, count }] } }`   |
+| GET    | `/events/suggest?q=`                                               | não                 | autocomplete, até 8 `{ id, name, location, starts_at }`                                              |
+| GET    | `/tickets/search?event_id=&status=&page=&size=`                    | `ADMIN`/`ORGANIZER` | ingressos: `{ items: [{ id, event_id, user_id, status, reserved_at, is_paid }], total, page, size }` |
 
 - **`/events/search`**: `multi_match` com `fuzziness: AUTO` em `name^3`, `name_stemmed^3`, `location^2`, `description` (analisador pt-BR: minúsculas, sem acento, stemming); sem `q`, ordena por data. Sempre só eventos futuros e não excluídos. `location` é o valor exato de uma faceta (filtro como `post_filter`, para a faceta continuar mostrando os outros locais). `available=true` filtra `available_tickets > 0`. `q`/`location` até 100 caracteres; `page` 1–200; `size` 1–50 (padrão 12). `from > to` é 400.
 - **`/events/suggest`**: `bool_prefix` no campo `search_as_you_type` (`name`, `name._2gram`, `name._3gram`), com os mesmos filtros de visibilidade.
@@ -307,11 +306,11 @@ O índice não recebe uma mensagem a cada reserva: isso geraria um UPDATE em `ev
 
 ### Variáveis novas
 
-| Variável | Padrão | Uso |
-| --- | --- | --- |
-| `ELASTICSEARCH_URL` | `http://localhost:9200` | nó do Elasticsearch (client 8.x, mesma major do servidor) |
-| `ELASTICSEARCH_REQUEST_TIMEOUT_MS` | `2000` | timeout por requisição; estourou, a busca responde 503 |
-| `AVAILABILITY_REFRESH_INTERVAL_MS` | `10000` | intervalo do job de disponibilidade; `0` desliga; valor inválido impede a API de subir |
+| Variável                           | Padrão                  | Uso                                                                                    |
+| ---------------------------------- | ----------------------- | -------------------------------------------------------------------------------------- |
+| `ELASTICSEARCH_URL`                | `http://localhost:9200` | nó do Elasticsearch (client 8.x, mesma major do servidor)                              |
+| `ELASTICSEARCH_REQUEST_TIMEOUT_MS` | `2000`                  | timeout por requisição; estourou, a busca responde 503                                 |
+| `AVAILABILITY_REFRESH_INTERVAL_MS` | `10000`                 | intervalo do job de disponibilidade; `0` desliga; valor inválido impede a API de subir |
 
 ### Testes
 
@@ -334,30 +333,30 @@ Outras garantias:
 - **Ordem**: `(event_id, position)` é único; `PATCH .../photos/order` recebe a galeria inteira na ordem nova, passa por posições negativas e grava 0..n-1 na mesma transação.
 - **Leitura pública**: a URL servida é `STORAGE_PUBLIC_URL + "/" + chave`. O banco guarda só a chave, então trocar de provedor ou pôr um CDN na frente não mexe no banco.
 - **Bucket fora do ar**: as rotas de upload/confirmação respondem 503; o resto da API não depende do S3 (o client não conecta ao subir).
-- **Não feito**: uploads pré-assinados que nunca são confirmados deixam o objeto no bucket (a chave já é a final). Em produção, dá para limpar com um job ou enviar para um prefixo `tmp/` com regra de *lifecycle* e copiar na confirmação.
+- **Não feito**: uploads pré-assinados que nunca são confirmados deixam o objeto no bucket (a chave já é a final). Em produção, dá para limpar com um job ou enviar para um prefixo `tmp/` com regra de _lifecycle_ e copiar na confirmação.
 
 ### Peças no código
 
-| Peça | Arquivo | Papel |
-| --- | --- | --- |
-| regras | `storage/core/entities/image.ts` | tipos aceitos, 5 MB, prefixos, formato da chave, assinatura dos formatos |
-| `IMAGE_STORAGE_SERVICE` | `storage/application/services/image-storage.service.ts` | porta inbound usada por `event` e `users`: presign, confirmação, URL pública, remoção silenciosa |
-| `OBJECT_STORAGE` | `storage/adapters/outbound/storage/s3-object-storage.ts` | `@aws-sdk/client-s3` + `@aws-sdk/s3-presigned-post`; rede/5xx/429 viram `ObjectStorageUnavailableError` (503) |
-| `STORAGE_METRICS` | `storage/adapters/outbound/metrics/otel-storage-metrics.ts` | `bilheteria.images.*` (ver [Métricas de negócio](#métricas-de-negócio)) |
-| `EVENT_IMAGE_SERVICE` | `event/application/services/event-image.service.ts` | quem pode, limite da galeria, troca/remoção da capa e das fotos |
-| `EVENT_IMAGE_REPOSITORY` | `event/adapters/outbound/repositories/event-image.repository.ts` | transações com o evento travado |
-| avatar | `users/application/services/user.service.ts` e `users/adapters/outbound/auth/better-auth.ts` | `avatar_key` + `customSession` (`avatarUrl`) |
+| Peça                     | Arquivo                                                                                      | Papel                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| regras                   | `storage/core/entities/image.ts`                                                             | tipos aceitos, 5 MB, prefixos, formato da chave, assinatura dos formatos                                      |
+| `IMAGE_STORAGE_SERVICE`  | `storage/application/services/image-storage.service.ts`                                      | porta inbound usada por `event` e `users`: presign, confirmação, URL pública, remoção silenciosa              |
+| `OBJECT_STORAGE`         | `storage/adapters/outbound/storage/s3-object-storage.ts`                                     | `@aws-sdk/client-s3` + `@aws-sdk/s3-presigned-post`; rede/5xx/429 viram `ObjectStorageUnavailableError` (503) |
+| `STORAGE_METRICS`        | `storage/adapters/outbound/metrics/otel-storage-metrics.ts`                                  | `bilheteria.images.*` (ver [Métricas de negócio](#métricas-de-negócio))                                       |
+| `EVENT_IMAGE_SERVICE`    | `event/application/services/event-image.service.ts`                                          | quem pode, limite da galeria, troca/remoção da capa e das fotos                                               |
+| `EVENT_IMAGE_REPOSITORY` | `event/adapters/outbound/repositories/event-image.repository.ts`                             | transações com o evento travado                                                                               |
+| avatar                   | `users/application/services/user.service.ts` e `users/adapters/outbound/auth/better-auth.ts` | `avatar_key` + `customSession` (`avatarUrl`)                                                                  |
 
 ### Variáveis do armazenamento
 
-| Variável | Padrão | Uso |
-| --- | --- | --- |
-| `STORAGE_S3_BUCKET` | `bilheteria-images` | bucket |
-| `STORAGE_S3_REGION` | `us-east-1` | região (no R2: `auto`) |
-| `STORAGE_S3_ENDPOINT` | — | vazio = AWS S3; LocalStack: `http://localhost:4566` (o navegador também precisa alcançar esse endereço: o POST vai direto para ele) |
-| `STORAGE_S3_FORCE_PATH_STYLE` | `false` | `true` no LocalStack/MinIO (`http://host/bucket/chave`) |
-| `STORAGE_S3_ACCESS_KEY_ID` / `STORAGE_S3_SECRET_ACCESS_KEY` | — | vazias = cadeia padrão da AWS (variáveis `AWS_*`, perfil, role da máquina). LocalStack: `test` / `test` |
-| `STORAGE_PUBLIC_URL` | derivada | base das URLs servidas; sem ela: `{endpoint}/{bucket}` (path-style) ou `https://{bucket}.s3.{region}.amazonaws.com` |
+| Variável                                                    | Padrão              | Uso                                                                                                                                 |
+| ----------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `STORAGE_S3_BUCKET`                                         | `bilheteria-images` | bucket                                                                                                                              |
+| `STORAGE_S3_REGION`                                         | `us-east-1`         | região (no R2: `auto`)                                                                                                              |
+| `STORAGE_S3_ENDPOINT`                                       | —                   | vazio = AWS S3; LocalStack: `http://localhost:4566` (o navegador também precisa alcançar esse endereço: o POST vai direto para ele) |
+| `STORAGE_S3_FORCE_PATH_STYLE`                               | `false`             | `true` no LocalStack/MinIO (`http://host/bucket/chave`)                                                                             |
+| `STORAGE_S3_ACCESS_KEY_ID` / `STORAGE_S3_SECRET_ACCESS_KEY` | —                   | vazias = cadeia padrão da AWS (variáveis `AWS_*`, perfil, role da máquina). LocalStack: `test` / `test`                             |
+| `STORAGE_PUBLIC_URL`                                        | derivada            | base das URLs servidas; sem ela: `{endpoint}/{bucket}` (path-style) ou `https://{bucket}.s3.{region}.amazonaws.com`                 |
 
 ### Trocando para S3 de verdade (ou CloudFront, R2, MinIO)
 
@@ -370,7 +369,6 @@ Só `.env`, nada de código:
 ### Testes
 
 Unitários sem S3: o adapter é testado com o SDK mockado (`S3Client.prototype.send` e `createPresignedPost`), o service de imagens com a porta mockada (validação, 503, objeto inválido apagado), o `EventImageService` (autorização, limite, troca/remoção com o objeto antigo apagado) e o repositório (lock antes da contagem, posições, reordenação em duas fases). O e2e confere `cover_url`/`photos` nas respostas e que todas as rotas de imagem exigem sessão.
-
 
 ## Setup
 
@@ -386,18 +384,18 @@ npm run start:dev
 
 Variáveis (ver `.env.example`):
 
-| Variável | Uso |
-| --- | --- |
-| `DATABASE_URL` | conexão do Postgres |
-| `BETTER_AUTH_SECRET` | assinatura das sessões (`openssl rand -base64 32`) |
-| `BETTER_AUTH_URL` | URL pública da API |
-| `FRONTEND_URL` | origem do front (CORS com cookies em todas as rotas), ex.: `http://localhost:3001` |
-| `CPF_HASH_SECRET` | chave do HMAC do CPF; trocar invalida os hashes existentes |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth Google |
-| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | OAuth Facebook |
-| `MP_*` | Mercado Pago, ver [Variáveis do pagamento](#variáveis-do-pagamento) |
-| `STORAGE_*` | bucket das imagens, ver [Variáveis do armazenamento](#variáveis-do-armazenamento) |
-| `OTEL_*`, `LOG_LEVEL`, `NODE_ENV` | opcionais, ver [Observabilidade](#observabilidade) |
+| Variável                                        | Uso                                                                                |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                  | conexão do Postgres                                                                |
+| `BETTER_AUTH_SECRET`                            | assinatura das sessões (`openssl rand -base64 32`)                                 |
+| `BETTER_AUTH_URL`                               | URL pública da API                                                                 |
+| `FRONTEND_URL`                                  | origem do front (CORS com cookies em todas as rotas), ex.: `http://localhost:3001` |
+| `CPF_HASH_SECRET`                               | chave do HMAC do CPF; trocar invalida os hashes existentes                         |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`     | OAuth Google                                                                       |
+| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | OAuth Facebook                                                                     |
+| `MP_*`                                          | Mercado Pago, ver [Variáveis do pagamento](#variáveis-do-pagamento)                |
+| `STORAGE_*`                                     | bucket das imagens, ver [Variáveis do armazenamento](#variáveis-do-armazenamento)  |
+| `OTEL_*`, `LOG_LEVEL`, `NODE_ENV`               | opcionais, ver [Observabilidade](#observabilidade)                                 |
 
 Depois de alterar `prisma/schema.prisma`, rode `npx prisma generate --config prisma7.config.ts` (ou `migrate dev`, que já gera).
 
@@ -451,21 +449,21 @@ As métricas de pagamento moraram na `TICKET_METRICS` até o módulo `payment` e
 
 O adapter recebe o `Meter` por DI (`OTEL_METER`, exportado pelo `ObservabilityModule`), o que permite testá-lo com um `MeterProvider` em memória (`test/utils/otel.ts`). Para uma métrica nova: método na porta, implementação no adapter, chamada no service, teste do adapter e do service.
 
-| Métrica (Prometheus) | Tipo | Labels | Significado |
-| --- | --- | --- | --- |
-| `bilheteria_reservations_total` | counter | `outcome` | tentativas de reserva por desfecho: `reserved`, `limit_reached`, `sold_out`, `no_cpf`, `event_started`, `event_not_found` |
-| `bilheteria_reservation_duration_seconds` | histograma | `outcome` | duração da tentativa de reserva (mesmos desfechos) |
-| `bilheteria_payments_confirmed_total` | counter | — | pagamentos confirmados (ticket pago) |
-| `bilheteria_payments_rejected_total` | counter | `reason` | aprovados pelo Mercado Pago mas recusados por nós (viram estorno): `expired`, `wrong_owner`, `already_paid`, `amount_mismatch` |
-| `bilheteria_payments_refunded_total` | counter | `reason` | estornos concluídos (mesmos motivos) |
-| `bilheteria_payments_not_approved_total` | counter | `status` | encerrados sem cobrança no Mercado Pago: `rejected`, `cancelled`, `expired` |
-| `bilheteria_payments_checkouts_total` | counter | `outcome` | checkouts abertos: `created` (nova order) ou `reused` (idempotência) |
-| `bilheteria_payments_webhooks_rejected_total` | counter | `reason` | notificações recusadas antes de processar: `missing_secret`, `missing_signature`, `malformed_signature`, `invalid_signature`, `stale_signature` |
-| `bilheteria_events_created_total` | counter | — | eventos criados |
-| `bilheteria_images_upload_urls_total` | counter | `kind` | POSTs pré-assinados emitidos: `event_cover`, `event_photo`, `user_avatar` |
-| `bilheteria_images_uploads_confirmed_total` | counter | `kind` | uploads conferidos no bucket e válidos |
-| `bilheteria_images_uploads_rejected_total` | counter | `kind`, `reason` | confirmações recusadas: `invalid_key`, `missing`, `too_large`, `invalid_type`, `invalid_content` |
-| `bilheteria_images_delete_failures_total` | counter | `kind` | imagens substituídas/removidas que não foram apagadas do bucket (órfãs) |
+| Métrica (Prometheus)                          | Tipo       | Labels           | Significado                                                                                                                                     |
+| --------------------------------------------- | ---------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bilheteria_reservations_total`               | counter    | `outcome`        | tentativas de reserva por desfecho: `reserved`, `limit_reached`, `sold_out`, `no_cpf`, `event_started`, `event_not_found`                       |
+| `bilheteria_reservation_duration_seconds`     | histograma | `outcome`        | duração da tentativa de reserva (mesmos desfechos)                                                                                              |
+| `bilheteria_payments_confirmed_total`         | counter    | —                | pagamentos confirmados (ticket pago)                                                                                                            |
+| `bilheteria_payments_rejected_total`          | counter    | `reason`         | aprovados pelo Mercado Pago mas recusados por nós (viram estorno): `expired`, `wrong_owner`, `already_paid`, `amount_mismatch`                  |
+| `bilheteria_payments_refunded_total`          | counter    | `reason`         | estornos concluídos (mesmos motivos)                                                                                                            |
+| `bilheteria_payments_not_approved_total`      | counter    | `status`         | encerrados sem cobrança no Mercado Pago: `rejected`, `cancelled`, `expired`                                                                     |
+| `bilheteria_payments_checkouts_total`         | counter    | `outcome`        | checkouts abertos: `created` (nova order) ou `reused` (idempotência)                                                                            |
+| `bilheteria_payments_webhooks_rejected_total` | counter    | `reason`         | notificações recusadas antes de processar: `missing_secret`, `missing_signature`, `malformed_signature`, `invalid_signature`, `stale_signature` |
+| `bilheteria_events_created_total`             | counter    | —                | eventos criados                                                                                                                                 |
+| `bilheteria_images_upload_urls_total`         | counter    | `kind`           | POSTs pré-assinados emitidos: `event_cover`, `event_photo`, `user_avatar`                                                                       |
+| `bilheteria_images_uploads_confirmed_total`   | counter    | `kind`           | uploads conferidos no bucket e válidos                                                                                                          |
+| `bilheteria_images_uploads_rejected_total`    | counter    | `kind`, `reason` | confirmações recusadas: `invalid_key`, `missing`, `too_large`, `invalid_type`, `invalid_content`                                                |
+| `bilheteria_images_delete_failures_total`     | counter    | `kind`           | imagens substituídas/removidas que não foram apagadas do bucket (órfãs)                                                                         |
 
 No código os instrumentos têm nomes OTel (`bilheteria.reservations`, `bilheteria.reservation.duration` em segundos...); o Alloy converte para os nomes acima. **Nunca** use id de usuário, evento ou ticket como label: cada valor distinto cria uma série nova no Prometheus. Ids vão em atributos de span.
 
@@ -479,15 +477,15 @@ Spans automáticos de HTTP, rotas do express, Better Auth, Prisma e `pg`. Span m
 
 ### Variáveis
 
-| Variável | Default | Uso |
-| --- | --- | --- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | coletor OTLP/HTTP (o Alloy) |
-| `OTEL_SDK_DISABLED` | `false` | `true` desliga traces, métricas e envio de logs |
-| `OTEL_METRIC_EXPORT_INTERVAL` | `15000` | ms entre envios de métricas |
-| `OTEL_LOG_LEVEL` | — | diagnóstico do próprio SDK (`error`, `warn`, `debug`...) |
-| `OTEL_NODE_DISABLED_INSTRUMENTATIONS` | — | desliga instrumentações extras, ex.: `undici,runtime-node` |
-| `LOG_LEVEL` | `info` (`silent` com `NODE_ENV=test`) | nível do pino |
-| `NODE_ENV` | `development` | `production` = logs em JSON; também vira `deployment.environment` |
+| Variável                              | Default                               | Uso                                                               |
+| ------------------------------------- | ------------------------------------- | ----------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`         | `http://localhost:4318`               | coletor OTLP/HTTP (o Alloy)                                       |
+| `OTEL_SDK_DISABLED`                   | `false`                               | `true` desliga traces, métricas e envio de logs                   |
+| `OTEL_METRIC_EXPORT_INTERVAL`         | `15000`                               | ms entre envios de métricas                                       |
+| `OTEL_LOG_LEVEL`                      | —                                     | diagnóstico do próprio SDK (`error`, `warn`, `debug`...)          |
+| `OTEL_NODE_DISABLED_INSTRUMENTATIONS` | —                                     | desliga instrumentações extras, ex.: `undici,runtime-node`        |
+| `LOG_LEVEL`                           | `info` (`silent` com `NODE_ENV=test`) | nível do pino                                                     |
+| `NODE_ENV`                            | `development`                         | `production` = logs em JSON; também vira `deployment.environment` |
 
 As demais `OTEL_*` da especificação (headers, timeouts, sampler...) também são respeitadas pelo SDK.
 
@@ -531,6 +529,7 @@ npm run test:load    # teste de carga (API rodando)
    - Depois: miniaturas/redimensionamento (ex.: worker na confirmação), limpeza de uploads nunca confirmados, `next/image` com `remotePatterns` vindo do `.env` e persistência do S3 local em dev.
 
 ### Pendências encontradas pelos testes
+
 - `GET /status/:id`: `reserved` inclui ingressos pagos (`total - available`).
 - Status usa `Date.now()` da aplicação e a reserva usa `NOW()` do Postgres.
 - DTOs: `event_id` aceita 0/negativo, `capacity` em string é rejeitado.

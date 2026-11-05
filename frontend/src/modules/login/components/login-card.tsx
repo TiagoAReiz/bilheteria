@@ -4,7 +4,13 @@ import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/card";
 import { useSession } from "@/shared/hooks/useSession";
 import { safeRedirectPath } from "@/shared/lib/auth-redirect";
 import { useSocialSignIn } from "../hooks/useSocialSignIn";
@@ -30,7 +36,9 @@ export function LoginCard() {
     <Card className="mx-auto w-full max-w-sm">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Entrar</CardTitle>
-        <CardDescription>Use sua conta Google ou Facebook para reservar ingressos.</CardDescription>
+        <CardDescription>
+          Use sua conta Google ou Facebook para reservar ingressos.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {providers.map((p) => (
@@ -41,12 +49,16 @@ export function LoginCard() {
             onClick={() => void signIn(p.id)}
             disabled={pending !== null || status !== "unauthenticated"}
           >
-            {pending === p.id ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+            {pending === p.id ? (
+              <Loader2Icon className="animate-spin" aria-hidden />
+            ) : null}
             {p.label}
           </Button>
         ))}
         {status === "authenticated" ? (
-          <p className="text-center text-sm text-muted-foreground">Você já está logado. Redirecionando...</p>
+          <p className="text-center text-sm text-muted-foreground">
+            Você já está logado. Redirecionando...
+          </p>
         ) : null}
       </CardContent>
     </Card>

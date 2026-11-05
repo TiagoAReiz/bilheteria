@@ -8,9 +8,14 @@ describe("getErrorMessage", () => {
   });
 
   it("junta a message em array (erros de validação)", () => {
-    expect(getErrorMessage(nestError(400, ["name should not be empty", "capacity must be an integer"]))).toBe(
-      "name should not be empty\ncapacity must be an integer",
-    );
+    expect(
+      getErrorMessage(
+        nestError(400, [
+          "name should not be empty",
+          "capacity must be an integer",
+        ]),
+      ),
+    ).toBe("name should not be empty\ncapacity must be an integer");
   });
 
   it("usa o fallback quando não há message", () => {
@@ -18,7 +23,9 @@ describe("getErrorMessage", () => {
   });
 
   it("informa erro de conexão quando não há response", () => {
-    expect(getErrorMessage(new AxiosError("Network Error"))).toBe("Não foi possível conectar ao servidor.");
+    expect(getErrorMessage(new AxiosError("Network Error"))).toBe(
+      "Não foi possível conectar ao servidor.",
+    );
   });
 
   it("aceita Error comum e valores desconhecidos", () => {

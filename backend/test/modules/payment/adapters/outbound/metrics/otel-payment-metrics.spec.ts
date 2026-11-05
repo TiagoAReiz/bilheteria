@@ -25,7 +25,10 @@ describe('OtelPaymentMetrics', () => {
     metrics.paymentConfirmed();
     metrics.paymentConfirmed();
 
-    const counter = findMetric(await otel.collect(), 'bilheteria.payments.confirmed');
+    const counter = findMetric(
+      await otel.collect(),
+      'bilheteria.payments.confirmed',
+    );
     expect(counter.descriptor.unit).toBe('{payment}');
     expect(sumPoints(counter)).toEqual([{ attributes: {}, value: 2 }]);
   });
@@ -35,7 +38,11 @@ describe('OtelPaymentMetrics', () => {
     metrics.paymentRejected('wrong_owner');
     metrics.paymentRejected('expired');
 
-    expect(sumPoints(findMetric(await otel.collect(), 'bilheteria.payments.rejected'))).toEqual(
+    expect(
+      sumPoints(
+        findMetric(await otel.collect(), 'bilheteria.payments.rejected'),
+      ),
+    ).toEqual(
       expect.arrayContaining([
         { attributes: { reason: 'expired' }, value: 2 },
         { attributes: { reason: 'wrong_owner' }, value: 1 },
@@ -44,14 +51,37 @@ describe('OtelPaymentMetrics', () => {
   });
 
   it.each([
-    ['paymentRefunded', 'bilheteria.payments.refunded', 'already_paid', { reason: 'already_paid' }],
-    ['paymentNotApproved', 'bilheteria.payments.not_approved', 'rejected', { status: 'rejected' }],
-    ['checkoutOpened', 'bilheteria.payments.checkouts', 'reused', { outcome: 'reused' }],
-    ['webhookRejected', 'bilheteria.payments.webhooks.rejected', 'invalid_signature', { reason: 'invalid_signature' }],
-  ] as const)('%s incrementa %s com um único label de baixa cardinalidade', async (method, name, value, attributes) => {
-    (metrics[method] as (v: string) => void)(value);
+    [
+      'paymentRefunded',
+      'bilheteria.payments.refunded',
+      'already_paid',
+      { reason: 'already_paid' },
+    ],
+    [
+      'paymentNotApproved',
+      'bilheteria.payments.not_approved',
+      'rejected',
+      { status: 'rejected' },
+    ],
+    [
+      'checkoutOpened',
+      'bilheteria.payments.checkouts',
+      'reused',
+      { outcome: 'reused' },
+    ],
+    [
+      'webhookRejected',
+      'bilheteria.payments.webhooks.rejected',
+      'invalid_signature',
+      { reason: 'invalid_signature' },
+    ],
+  ] as const)(
+    '%s incrementa %s com um único label de baixa cardinalidade',
+    async (method, name, value, attributes) => {
+      (metrics[method] as (v: string) => void)(value);
 
-    const points = sumPoints(findMetric(await otel.collect(), name));
-    expect(points).toEqual([{ attributes, value: 1 }]);
-  });
+      const points = sumPoints(findMetric(await otel.collect(), name));
+      expect(points).toEqual([{ attributes, value: 1 }]);
+    },
+  );
 });

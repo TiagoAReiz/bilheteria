@@ -3,24 +3,24 @@
 export type MyTicketStatus = 'paid' | 'reserved';
 
 export interface MyTicketEvent {
-    id: number;
-    name: string;
-    location: string;
-    starts_at: Date;
+  id: number;
+  name: string;
+  location: string;
+  starts_at: Date;
 }
 
 export interface MyTicket {
-    id: number;
-    status: MyTicketStatus;
-    /** Fim da reserva (reserved_at + TTL); nulo quando já pago. */
-    reserved_until: Date | null;
-    event: MyTicketEvent;
+  id: number;
+  status: MyTicketStatus;
+  /** Fim da reserva (reserved_at + TTL); nulo quando já pago. */
+  reserved_until: Date | null;
+  event: MyTicketEvent;
 }
 
 /** Linha bruta do repositório: o serviço decide status e prazo. */
 export interface UserTicketRow {
-    id: number;
-    is_paid: boolean;
-    reserved_at: Date | null;
-    event: MyTicketEvent;
+  id: number;
+  is_paid: boolean;
+  reserved_at: Date | null;
+  event: MyTicketEvent;
 }

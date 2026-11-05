@@ -31,7 +31,12 @@ const configOf = (env: Record<string, string | undefined>) =>
   ({ get: (name: string) => env[name] }) as unknown as ConfigService;
 
 const s3Error = (name: string, status: number) =>
-  new S3ServiceException({ name, $fault: status >= 500 ? 'server' : 'client', $metadata: { httpStatusCode: status }, message: name });
+  new S3ServiceException({
+    name,
+    $fault: status >= 500 ? 'server' : 'client',
+    $metadata: { httpStatusCode: status },
+    message: name,
+  });
 
 describe('readStorageSettings', () => {
   it('LocalStack: endpoint, path-style e URL pública do .env (sem barra no fim)', () => {
@@ -59,12 +64,18 @@ describe('readStorageSettings', () => {
   });
 
   it('sem STORAGE_PUBLIC_URL deriva a URL do endpoint', () => {
-    expect(readStorageSettings(configOf({ ...LOCALSTACK_ENV, STORAGE_PUBLIC_URL: '' })).publicUrl).toBe(
-      'http://localhost:4566/bilheteria-images',
-    );
     expect(
-      readStorageSettings(configOf({ STORAGE_S3_ENDPOINT: 'https://acc.r2.cloudflarestorage.com', STORAGE_S3_BUCKET: 'b' }))
-        .publicUrl,
+      readStorageSettings(
+        configOf({ ...LOCALSTACK_ENV, STORAGE_PUBLIC_URL: '' }),
+      ).publicUrl,
+    ).toBe('http://localhost:4566/bilheteria-images');
+    expect(
+      readStorageSettings(
+        configOf({
+          STORAGE_S3_ENDPOINT: 'https://acc.r2.cloudflarestorage.com',
+          STORAGE_S3_BUCKET: 'b',
+        }),
+      ).publicUrl,
     ).toBe('https://b.acc.r2.cloudflarestorage.com');
   });
 });
@@ -87,27 +98,48 @@ describe('S3ObjectStorage', () => {
     const client = (storage as unknown as { client: S3Client }).client;
     expect(client.config.forcePathStyle).toBe(true);
     await expect(client.config.region()).resolves.toBe('us-east-1');
-    await expect(client.config.credentials()).resolves.toMatchObject({ accessKeyId: 'test', secretAccessKey: 'test' });
+    await expect(client.config.credentials()).resolves.toMatchObject({
+      accessKeyId: 'test',
+      secretAccessKey: 'test',
+    });
     const endpoint = await client.config.endpoint!();
-    expect(`${endpoint.protocol}//${endpoint.hostname}:${endpoint.port}`).toBe('http://localhost:4566');
+    expect(`${endpoint.protocol}//${endpoint.hostname}:${endpoint.port}`).toBe(
+      'http://localhost:4566',
+    );
   });
 
   it('createPresignedPost: chave exata, Content-Type e Cache-Control fixos e content-length-range', async () => {
     vi.mocked(createPresignedPost).mockResolvedValue({
       url: 'http://localhost:4566/bilheteria-images',
-      fields: { key: 'events/1/cover/a.png', Policy: 'p', 'X-Amz-Signature': 's' },
+      fields: {
+        key: 'events/1/cover/a.png',
+        Policy: 'p',
+        'X-Amz-Signature': 's',
+      },
     });
 
     await expect(
-      storage.createPresignedPost({ key: 'events/1/cover/a.png', contentType: 'image/png', maxBytes: 5_242_880, expiresInSeconds: 300 }),
+      storage.createPresignedPost({
+        key: 'events/1/cover/a.png',
+        contentType: 'image/png',
+        maxBytes: 5_242_880,
+        expiresInSeconds: 300,
+      }),
     ).resolves.toEqual({
       url: 'http://localhost:4566/bilheteria-images',
-      fields: { key: 'events/1/cover/a.png', Policy: 'p', 'X-Amz-Signature': 's' },
+      fields: {
+        key: 'events/1/cover/a.png',
+        Policy: 'p',
+        'X-Amz-Signature': 's',
+      },
     });
     expect(createPresignedPost).toHaveBeenCalledWith(expect.any(S3Client), {
       Bucket: 'bilheteria-images',
       Key: 'events/1/cover/a.png',
-      Fields: { 'Content-Type': 'image/png', 'Cache-Control': IMMUTABLE_CACHE_CONTROL },
+      Fields: {
+        'Content-Type': 'image/png',
+        'Cache-Control': IMMUTABLE_CACHE_CONTROL,
+      },
       Conditions: [['content-length-range', 1, 5_242_880]],
       Expires: 300,
     });
@@ -118,10 +150,16 @@ describe('S3ObjectStorage', () => {
     it('devolve tamanho e tipo', async () => {
       send.mockResolvedValue({ ContentLength: 2048, ContentType: 'image/png' });
 
-      await expect(storage.headObject('k.png')).resolves.toEqual({ size: 2048, contentType: 'image/png' });
+      await expect(storage.headObject('k.png')).resolves.toEqual({
+        size: 2048,
+        contentType: 'image/png',
+      });
       const command = send.mock.calls[0][0] as HeadObjectCommand;
       expect(command).toBeInstanceOf(HeadObjectCommand);
-      expect(command.input).toEqual({ Bucket: 'bilheteria-images', Key: 'k.png' });
+      expect(command.input).toEqual({
+        Bucket: 'bilheteria-images',
+        Key: 'k.png',
+      });
     });
 
     it('404 vira null', async () => {
@@ -132,10 +170,17 @@ describe('S3ObjectStorage', () => {
     it.each([
       ['5xx', s3Error('InternalError', 500)],
       ['throttling', s3Error('SlowDown', 429)],
-      ['rede (sem status)', Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:4566'), { code: 'ECONNREFUSED' })],
+      [
+        'rede (sem status)',
+        Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:4566'), {
+          code: 'ECONNREFUSED',
+        }),
+      ],
     ])('%s vira ObjectStorageUnavailableError', async (_case, error) => {
       send.mockRejectedValue(error);
-      await expect(storage.headObject('k.png')).rejects.toBeInstanceOf(ObjectStorageUnavailableError);
+      await expect(storage.headObject('k.png')).rejects.toBeInstanceOf(
+        ObjectStorageUnavailableError,
+      );
     });
 
     it('403 (credencial/política) propaga como erro comum', async () => {
@@ -148,17 +193,25 @@ describe('S3ObjectStorage', () => {
   describe('readPrefix', () => {
     it('lê só os primeiros bytes (Range)', async () => {
       const bytes = Uint8Array.from([1, 2, 3]);
-      send.mockResolvedValue({ Body: { transformToByteArray: vi.fn().mockResolvedValue(bytes) } });
+      send.mockResolvedValue({
+        Body: { transformToByteArray: vi.fn().mockResolvedValue(bytes) },
+      });
 
       await expect(storage.readPrefix('k.png', 12)).resolves.toBe(bytes);
       const command = send.mock.calls[0][0] as GetObjectCommand;
       expect(command).toBeInstanceOf(GetObjectCommand);
-      expect(command.input).toEqual({ Bucket: 'bilheteria-images', Key: 'k.png', Range: 'bytes=0-11' });
+      expect(command.input).toEqual({
+        Bucket: 'bilheteria-images',
+        Key: 'k.png',
+        Range: 'bytes=0-11',
+      });
     });
 
     it('objeto sumiu: bytes vazios (a assinatura não bate)', async () => {
       send.mockRejectedValue(s3Error('NoSuchKey', 404));
-      await expect(storage.readPrefix('k.png', 12)).resolves.toEqual(new Uint8Array());
+      await expect(storage.readPrefix('k.png', 12)).resolves.toEqual(
+        new Uint8Array(),
+      );
     });
   });
 
@@ -168,17 +221,24 @@ describe('S3ObjectStorage', () => {
       await storage.deleteObject('k.png');
       const command = send.mock.calls[0][0] as DeleteObjectCommand;
       expect(command).toBeInstanceOf(DeleteObjectCommand);
-      expect(command.input).toEqual({ Bucket: 'bilheteria-images', Key: 'k.png' });
+      expect(command.input).toEqual({
+        Bucket: 'bilheteria-images',
+        Key: 'k.png',
+      });
     });
 
     it('bucket fora vira ObjectStorageUnavailableError', async () => {
       send.mockRejectedValue(s3Error('ServiceUnavailable', 503));
-      await expect(storage.deleteObject('k.png')).rejects.toBeInstanceOf(ObjectStorageUnavailableError);
+      await expect(storage.deleteObject('k.png')).rejects.toBeInstanceOf(
+        ObjectStorageUnavailableError,
+      );
     });
   });
 
   it('publicUrl junta a base com a chave, codificando cada segmento', () => {
-    expect(storage.publicUrl('events/1/cover/a.png')).toBe('http://localhost:4566/bilheteria-images/events/1/cover/a.png');
+    expect(storage.publicUrl('events/1/cover/a.png')).toBe(
+      'http://localhost:4566/bilheteria-images/events/1/cover/a.png',
+    );
     expect(storage.publicUrl('users/a b%/avatar/x.png')).toBe(
       'http://localhost:4566/bilheteria-images/users/a%20b%25/avatar/x.png',
     );

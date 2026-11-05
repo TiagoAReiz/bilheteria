@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss",
+    "prisma.prisma",
+    "vitest.explorer",
+    "yoavbls.pretty-ts-errors",
+    "usernamehw.errorlens",
+    "mikestead.dotenv",
+    "humao.rest-client",
+    "eamodio.gitlens",
+    "ms-azuretools.vscode-containers"
+  ]
+}

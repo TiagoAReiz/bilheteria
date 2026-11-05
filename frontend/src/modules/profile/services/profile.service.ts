@@ -5,7 +5,11 @@ import type {
   ImageContentType,
   PresignedUpload,
 } from "@/shared/types/image";
-import type { AvatarResponse, RegisterCpfRequest, UserMeResponse } from "../types/profile.dto";
+import type {
+  AvatarResponse,
+  RegisterCpfRequest,
+  UserMeResponse,
+} from "../types/profile.dto";
 
 export const profileService = {
   async getMe(): Promise<UserMeResponse> {
@@ -22,9 +26,14 @@ export const profileService = {
     await api.patch("/users/me/organizer");
   },
 
-  async createAvatarUpload(contentType: ImageContentType): Promise<PresignedUpload> {
+  async createAvatarUpload(
+    contentType: ImageContentType,
+  ): Promise<PresignedUpload> {
     const body: CreateImageUploadRequest = { content_type: contentType };
-    const { data } = await api.post<PresignedUpload>("/users/me/avatar/upload-url", body);
+    const { data } = await api.post<PresignedUpload>(
+      "/users/me/avatar/upload-url",
+      body,
+    );
     return data;
   },
 

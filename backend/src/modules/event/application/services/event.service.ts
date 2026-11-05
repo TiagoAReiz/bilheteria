@@ -1,22 +1,45 @@
-import {ConflictException, ForbiddenException, Inject, Injectable} from '@nestjs/common';
-import {Event} from "../../core/entities/event.entity.js";
-import {NewEvent} from "../../core/entities/new-event.entity.js";
-import {EventDetailView, EventView, toEventView, toPhotoViews} from "../../core/entities/event-image.entity.js";
-import {checkEventUpdate, EventChanges, EventEditor, EventUpdateRejection} from "../../core/entities/event-update.js";
-import {EventServicePort} from "../ports/inbound/services/event.service.port.js";
-import {EVENT_REPOSITORY, type EventRepositoryPort} from "../ports/outbound/repositories/event.repository.port.js";
-import {EVENT_METRICS, type EventMetricsPort} from "../ports/outbound/metrics/event-metrics.port.js";
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
+import { Event } from '../../core/entities/event.entity.js';
+import { NewEvent } from '../../core/entities/new-event.entity.js';
+import {
+  EventDetailView,
+  EventView,
+  toEventView,
+  toPhotoViews,
+} from '../../core/entities/event-image.entity.js';
+import {
+  checkEventUpdate,
+  EventChanges,
+  EventEditor,
+  EventUpdateRejection,
+} from '../../core/entities/event-update.js';
+import { EventServicePort } from '../ports/inbound/services/event.service.port.js';
+import {
+  EVENT_REPOSITORY,
+  type EventRepositoryPort,
+} from '../ports/outbound/repositories/event.repository.port.js';
+import {
+  EVENT_METRICS,
+  type EventMetricsPort,
+} from '../ports/outbound/metrics/event-metrics.port.js';
 import {
   IMAGE_STORAGE_SERVICE,
   type ImageStorageServicePort,
-} from "../../../storage/application/ports/inbound/services/image-storage.service.port.js";
+} from '../../../storage/application/ports/inbound/services/image-storage.service.port.js';
 
 @Injectable()
 export class EventService implements EventServicePort {
   constructor(
-      @Inject(EVENT_REPOSITORY) private readonly eventRepository: EventRepositoryPort,
-      @Inject(EVENT_METRICS) private readonly metrics: EventMetricsPort,
-      @Inject(IMAGE_STORAGE_SERVICE) private readonly images: ImageStorageServicePort,
+    @Inject(EVENT_REPOSITORY)
+    private readonly eventRepository: EventRepositoryPort,
+    @Inject(EVENT_METRICS) private readonly metrics: EventMetricsPort,
+    @Inject(IMAGE_STORAGE_SERVICE)
+    private readonly images: ImageStorageServicePort,
   ) {}
 
   async createEvent(event: NewEvent): Promise<EventView> {
@@ -26,7 +49,9 @@ export class EventService implements EventServicePort {
   }
 
   async listUpcomingEvents(): Promise<EventView[]> {
-    return (await this.eventRepository.getUpcomingEvents()).map((event) => this.toView(event));
+    return (await this.eventRepository.getUpcomingEvents()).map((event) =>
+      this.toView(event),
+    );
   }
 
   async getEventById(id: number): Promise<Event> {
@@ -34,17 +59,27 @@ export class EventService implements EventServicePort {
   }
 
   async getEventDetail(id: number): Promise<EventDetailView> {
-    const {photos, ...event} = await this.eventRepository.getEventWithPhotos(id);
-    return {...this.toView(event), photos: toPhotoViews(photos, (key) => this.images.publicUrl(key))};
+    const { photos, ...event } =
+      await this.eventRepository.getEventWithPhotos(id);
+    return {
+      ...this.toView(event),
+      photos: toPhotoViews(photos, (key) => this.images.publicUrl(key)),
+    };
   }
 
   async getEventIdsByOrganizer(organizerId: string): Promise<number[]> {
     return this.eventRepository.getEventIdsByOrganizer(organizerId);
   }
 
-  async updateEvent(id: number, editor: EventEditor, changes: EventChanges): Promise<EventView> {
+  async updateEvent(
+    id: number,
+    editor: EventEditor,
+    changes: EventChanges,
+  ): Promise<EventView> {
     const result = await this.eventRepository.updateWithTickets(
-        id, changes, (current) => checkEventUpdate(current, changes, editor, new Date()),
+      id,
+      changes,
+      (current) => checkEventUpdate(current, changes, editor, new Date()),
     );
     if (result.outcome === 'rejected') {
       throw this.rejection(result.reason);
@@ -55,15 +90,25 @@ export class EventService implements EventServicePort {
   private rejection(reason: EventUpdateRejection): Error {
     switch (reason) {
       case 'forbidden':
-        return new ForbiddenException('Só o organizador do evento pode editá-lo');
+        return new ForbiddenException(
+          'Só o organizador do evento pode editá-lo',
+        );
       case 'event_started':
-        return new ConflictException('O evento já começou e não pode mais ser editado');
+        return new ConflictException(
+          'O evento já começou e não pode mais ser editado',
+        );
       case 'capacity_decrease':
-        return new ConflictException('A capacidade não pode diminuir, só aumentar');
+        return new ConflictException(
+          'A capacidade não pode diminuir, só aumentar',
+        );
       case 'limit_decrease':
-        return new ConflictException('O limite de ingressos por CPF não pode diminuir, só aumentar');
+        return new ConflictException(
+          'O limite de ingressos por CPF não pode diminuir, só aumentar',
+        );
       case 'limit_above_capacity':
-        return new ConflictException('O limite de ingressos por CPF não pode ser maior que a capacidade');
+        return new ConflictException(
+          'O limite de ingressos por CPF não pode ser maior que a capacidade',
+        );
     }
   }
 

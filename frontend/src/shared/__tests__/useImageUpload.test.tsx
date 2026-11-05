@@ -26,7 +26,9 @@ const image = (type = "image/webp", size = 1024) => {
 
 function setup() {
   const requestUpload = jest.fn().mockResolvedValue(presigned);
-  const confirm = jest.fn().mockResolvedValue({ cover_url: "http://cdn/abc.webp" });
+  const confirm = jest
+    .fn()
+    .mockResolvedValue({ cover_url: "http://cdn/abc.webp" });
   const hook = renderHook(() => useImageUpload({ requestUpload, confirm }));
   return { ...hook, requestUpload, confirm };
 }
@@ -47,7 +49,10 @@ describe("useImageUpload", () => {
     expect(requestUpload).toHaveBeenCalledWith("image/webp");
     expect(uploadToBucket).toHaveBeenCalledWith(presigned, file);
     expect(confirm).toHaveBeenCalledWith("events/1/cover/abc.webp");
-    expect(outcome).toEqual({ ok: true, value: { cover_url: "http://cdn/abc.webp" } });
+    expect(outcome).toEqual({
+      ok: true,
+      value: { cover_url: "http://cdn/abc.webp" },
+    });
     expect(result.current.error).toBeNull();
     expect(result.current.uploading).toBe(false);
   });
@@ -60,7 +65,10 @@ describe("useImageUpload", () => {
       outcome = await result.current.upload(image("image/gif"));
     });
 
-    expect(outcome).toEqual({ ok: false, error: "Envie uma imagem JPEG, PNG ou WebP." });
+    expect(outcome).toEqual({
+      ok: false,
+      error: "Envie uma imagem JPEG, PNG ou WebP.",
+    });
     expect(result.current.error).toBe("Envie uma imagem JPEG, PNG ou WebP.");
     expect(requestUpload).not.toHaveBeenCalled();
     expect(uploadToBucket).not.toHaveBeenCalled();
@@ -76,7 +84,9 @@ describe("useImageUpload", () => {
   });
 
   it("bucket recusou: não confirma", async () => {
-    uploadToBucket.mockRejectedValue(new Error("A imagem deve ter no máximo 5 MB."));
+    uploadToBucket.mockRejectedValue(
+      new Error("A imagem deve ter no máximo 5 MB."),
+    );
     const { result, confirm } = setup();
 
     await act(async () => {
@@ -89,21 +99,28 @@ describe("useImageUpload", () => {
 
   it("erro da API (ex.: 403 de quem não é dono) vira a mensagem do Nest", async () => {
     const { result, requestUpload } = setup();
-    requestUpload.mockRejectedValue(nestError(403, "Só o organizador do evento pode alterar as imagens dele"));
+    requestUpload.mockRejectedValue(
+      nestError(403, "Só o organizador do evento pode alterar as imagens dele"),
+    );
 
     let outcome: unknown;
     await act(async () => {
       outcome = await result.current.upload(image());
     });
 
-    expect(outcome).toEqual({ ok: false, error: "Só o organizador do evento pode alterar as imagens dele" });
+    expect(outcome).toEqual({
+      ok: false,
+      error: "Só o organizador do evento pode alterar as imagens dele",
+    });
     expect(uploadToBucket).not.toHaveBeenCalled();
   });
 
   it("confirmação recusada (ex.: 409 galeria cheia)", async () => {
     uploadToBucket.mockResolvedValue();
     const { result, confirm } = setup();
-    confirm.mockRejectedValue(nestError(409, "A galeria aceita no máximo 10 fotos"));
+    confirm.mockRejectedValue(
+      nestError(409, "A galeria aceita no máximo 10 fotos"),
+    );
 
     await act(async () => {
       await result.current.upload(image());

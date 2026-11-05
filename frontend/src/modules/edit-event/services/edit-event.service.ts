@@ -1,6 +1,9 @@
 import { api } from "@/shared/services/api";
 import type { EventResponse } from "@/shared/types/event";
-import type { UpdateEventRequest, UpdateEventResponse } from "../types/edit-event.dto";
+import type {
+  UpdateEventRequest,
+  UpdateEventResponse,
+} from "../types/edit-event.dto";
 
 export const editEventService = {
   async getEvent(id: number): Promise<EventResponse> {
@@ -8,8 +11,14 @@ export const editEventService = {
     return data;
   },
 
-  async update(id: number, body: UpdateEventRequest): Promise<UpdateEventResponse> {
-    const { data } = await api.patch<UpdateEventResponse>(`/events/${id}`, body);
+  async update(
+    id: number,
+    body: UpdateEventRequest,
+  ): Promise<UpdateEventResponse> {
+    const { data } = await api.patch<UpdateEventResponse>(
+      `/events/${id}`,
+      body,
+    );
     return data;
   },
 };

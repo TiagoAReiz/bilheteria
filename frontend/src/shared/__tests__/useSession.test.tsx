@@ -10,14 +10,19 @@ jest.mock("@/shared/services/session.service", () => ({
 
 const getSession = jest.mocked(sessionService.getSession);
 const signOut = jest.mocked(sessionService.signOut);
-const wrapper = ({ children }: { children: ReactNode }) => <SessionProvider>{children}</SessionProvider>;
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <SessionProvider>{children}</SessionProvider>
+);
 
 describe("useSession", () => {
   beforeEach(() => jest.resetAllMocks());
 
   it("carrega o usuário logado", async () => {
     const user = makeUser();
-    getSession.mockResolvedValue({ session: { id: "s", userId: user.id, expiresAt: "" }, user });
+    getSession.mockResolvedValue({
+      session: { id: "s", userId: user.id, expiresAt: "" },
+      user,
+    });
 
     const { result } = renderHook(() => useSession(), { wrapper });
     expect(result.current.status).toBe("loading");
@@ -41,7 +46,10 @@ describe("useSession", () => {
 
   it("signOut limpa o usuário", async () => {
     const user = makeUser();
-    getSession.mockResolvedValue({ session: { id: "s", userId: user.id, expiresAt: "" }, user });
+    getSession.mockResolvedValue({
+      session: { id: "s", userId: user.id, expiresAt: "" },
+      user,
+    });
     signOut.mockResolvedValue();
     const { result } = renderHook(() => useSession(), { wrapper });
     await waitFor(() => expect(result.current.status).toBe("authenticated"));

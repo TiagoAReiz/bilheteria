@@ -13,7 +13,11 @@ export interface EventImagesState {
 }
 
 /** Troca `photos[index]` com o vizinho (-1 = para a esquerda, 1 = para a direita). */
-export function movedOrder(photos: EventPhoto[], photoId: number, direction: -1 | 1): number[] | null {
+export function movedOrder(
+  photos: EventPhoto[],
+  photoId: number,
+  direction: -1 | 1,
+): number[] | null {
   const ids = photos.map((photo) => photo.id);
   const index = ids.indexOf(photoId);
   const target = index + direction;
@@ -33,11 +37,13 @@ export function useEventImages(eventId: number, initial: EventImagesState) {
   const [error, setError] = useState<string | null>(null);
 
   const cover = useImageUpload({
-    requestUpload: (type: ImageContentType) => eventImagesService.createCoverUpload(eventId, type),
+    requestUpload: (type: ImageContentType) =>
+      eventImagesService.createCoverUpload(eventId, type),
     confirm: (key: string) => eventImagesService.confirmCover(eventId, key),
   });
   const photo = useImageUpload({
-    requestUpload: (type: ImageContentType) => eventImagesService.createPhotoUpload(eventId, type),
+    requestUpload: (type: ImageContentType) =>
+      eventImagesService.createPhotoUpload(eventId, type),
     confirm: (key: string) => eventImagesService.confirmPhoto(eventId, key),
   });
 
@@ -62,20 +68,26 @@ export function useEventImages(eventId: number, initial: EventImagesState) {
   );
 
   // operações sem upload (remover, reordenar): mesmo tratamento de erro/ocupado
-  const run = useCallback(async (work: () => Promise<void>, fallback: string): Promise<string | null> => {
-    setBusy(true);
-    setError(null);
-    try {
-      await work();
-      return null;
-    } catch (err) {
-      const message = getErrorMessage(err, fallback);
-      setError(message);
-      return message;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const run = useCallback(
+    async (
+      work: () => Promise<void>,
+      fallback: string,
+    ): Promise<string | null> => {
+      setBusy(true);
+      setError(null);
+      try {
+        await work();
+        return null;
+      } catch (err) {
+        const message = getErrorMessage(err, fallback);
+        setError(message);
+        return message;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
+  );
 
   const removeCover = useCallback(
     () =>
@@ -100,7 +112,10 @@ export function useEventImages(eventId: number, initial: EventImagesState) {
       const order = movedOrder(photos, photoId, direction);
       if (!order) return null;
       return run(async () => {
-        const { photos: next } = await eventImagesService.reorderPhotos(eventId, order);
+        const { photos: next } = await eventImagesService.reorderPhotos(
+          eventId,
+          order,
+        );
         setPhotos(next);
       }, "Não foi possível reordenar a galeria.");
     },

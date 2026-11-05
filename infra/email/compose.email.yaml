@@ -1,0 +1,22 @@
+# Email em desenvolvimento: Mailpit, um servidor SMTP falso com caixa de entrada web.
+# Incluído pelo docker-compose.yaml da raiz (diretiva `include`). Detalhes no README da raiz,
+# seção "Emails (Resend / Mailpit)".
+#
+# A API (EMAIL_DRIVER=smtp, o padrão) envia para localhost:1025; nada sai para a internet.
+# Tudo que a API mandar aparece em http://localhost:8025, com HTML, texto puro e cabeçalhos.
+# Em produção (ou para testar a entrega real) troque para EMAIL_DRIVER=resend.
+# Sem volume: as mensagens somem quando o contêiner é recriado (é só uma caixa de testes).
+
+services:
+
+  mailpit:
+    image: axllent/mailpit:v1.31.5
+    restart: unless-stopped
+    ports:
+      - 1025:1025     # SMTP (a API envia aqui)
+      - 8025:8025     # caixa de entrada web
+    environment:
+      MP_MAX_MESSAGES: 500
+      # aceita qualquer remetente/destinatário sem autenticação (só dev)
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"

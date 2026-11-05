@@ -1,7 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useSession } from "@/shared/hooks/useSession";
@@ -34,7 +38,12 @@ export function ProfileView() {
           <AlertTitle>Não foi possível carregar seu perfil</AlertTitle>
           <AlertDescription>
             <p>{error}</p>
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => void reload()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => void reload()}
+            >
               Tentar novamente
             </Button>
           </AlertDescription>
@@ -42,12 +51,20 @@ export function ProfileView() {
       ) : (
         <>
           <ProfileCard user={user} onAvatarChanged={reloadProfileAndSession} />
-          {user.role === "USER" ? <BecomeOrganizerCard onBecameOrganizer={reloadProfileAndSession} /> : null}
+          {user.role === "USER" ? (
+            <BecomeOrganizerCard onBecameOrganizer={reloadProfileAndSession} />
+          ) : null}
         </>
       )}
 
       {/* espera o perfil para não piscar o formulário de quem já tem CPF */}
-      {loading ? null : <CpfForm returnTo={returnTo} registered={user?.hasCpf ?? false} maskedCpf={user?.cpfMasked ?? null} />}
+      {loading ? null : (
+        <CpfForm
+          returnTo={returnTo}
+          registered={user?.hasCpf ?? false}
+          maskedCpf={user?.cpfMasked ?? null}
+        />
+      )}
     </div>
   );
 }

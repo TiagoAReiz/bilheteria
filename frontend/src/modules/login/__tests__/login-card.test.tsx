@@ -16,7 +16,9 @@ jest.mock("next/navigation", () => ({
 jest.mock("sonner", () => ({ toast: { error: jest.fn() } }));
 jest.mock("@/shared/lib/navigation", () => ({ hardRedirect: jest.fn() }));
 jest.mock("@/shared/hooks/useSession", () => ({ useSession: jest.fn() }));
-jest.mock("../services/login.service", () => ({ loginService: { signInSocial: jest.fn() } }));
+jest.mock("../services/login.service", () => ({
+  loginService: { signInSocial: jest.fn() },
+}));
 
 const signInSocial = jest.mocked(loginService.signInSocial);
 
@@ -29,29 +31,48 @@ describe("<LoginCard />", () => {
 
   it("Entrar com Google: pede a URL ao backend com callback absoluto e redireciona", async () => {
     search = new URLSearchParams("redirect=/events/4");
-    signInSocial.mockResolvedValue({ url: "https://accounts.google.com/o/oauth", redirect: true });
+    signInSocial.mockResolvedValue({
+      url: "https://accounts.google.com/o/oauth",
+      redirect: true,
+    });
     render(<LoginCard />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Entrar com Google" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Entrar com Google" }),
+    );
 
-    expect(signInSocial).toHaveBeenCalledWith("google", "http://localhost/events/4");
-    expect(hardRedirect).toHaveBeenCalledWith("https://accounts.google.com/o/oauth");
+    expect(signInSocial).toHaveBeenCalledWith(
+      "google",
+      "http://localhost/events/4",
+    );
+    expect(hardRedirect).toHaveBeenCalledWith(
+      "https://accounts.google.com/o/oauth",
+    );
   });
 
   it("Entrar com Facebook usa o provider facebook e ignora redirect externo", async () => {
     search = new URLSearchParams("redirect=https://evil.com");
-    signInSocial.mockResolvedValue({ url: "https://facebook.com/dialog", redirect: true });
+    signInSocial.mockResolvedValue({
+      url: "https://facebook.com/dialog",
+      redirect: true,
+    });
     render(<LoginCard />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Entrar com Facebook" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Entrar com Facebook" }),
+    );
     expect(signInSocial).toHaveBeenCalledWith("facebook", "http://localhost/");
   });
 
   it("mostra toast se o backend falhar", async () => {
     signInSocial.mockRejectedValue(nestError(500, "Provider not found"));
     render(<LoginCard />);
-    await userEvent.click(screen.getByRole("button", { name: "Entrar com Google" }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Provider not found"));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Entrar com Google" }),
+    );
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Provider not found"),
+    );
     expect(hardRedirect).not.toHaveBeenCalled();
   });
 

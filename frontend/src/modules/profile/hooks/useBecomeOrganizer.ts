@@ -16,7 +16,10 @@ export function useBecomeOrganizer() {
       await profileService.becomeOrganizer();
       return null;
     } catch (err) {
-      const message = getErrorMessage(err, "Não foi possível alterar seu perfil.");
+      const message = getErrorMessage(
+        err,
+        "Não foi possível alterar seu perfil.",
+      );
       setError(message);
       return message;
     } finally {

@@ -4,12 +4,27 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { LockIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
-import { isValidCpf, maskCpf, maskCpfForDisplay, onlyDigits } from "@/shared/lib/cpf";
+import {
+  isValidCpf,
+  maskCpf,
+  maskCpfForDisplay,
+  onlyDigits,
+} from "@/shared/lib/cpf";
 import { useRegisterCpf } from "../hooks/useRegisterCpf";
 
 export const CPF_RULES_TEXT =
@@ -36,7 +51,9 @@ export function CpfRegistrationForm({
   const [cpf, setCpf] = useState("");
   const [touched, setTouched] = useState(false);
   /** Máscara do CPF cadastrado agora (o da API só chega no próximo GET /users/me). */
-  const [justRegisteredMask, setJustRegisteredMask] = useState<string | null>(null);
+  const [justRegisteredMask, setJustRegisteredMask] = useState<string | null>(
+    null,
+  );
   const { register, loading, error, locked: justLocked } = useRegisterCpf();
 
   const complete = onlyDigits(cpf).length === 11;
@@ -51,7 +68,8 @@ export function CpfRegistrationForm({
     if (outcome === "registered") {
       setJustRegisteredMask(maskCpfForDisplay(cpf));
       toast.success("CPF cadastrado com sucesso!");
-    } else if (outcome === "already_registered") toast.info("Seu CPF já estava cadastrado.");
+    } else if (outcome === "already_registered")
+      toast.info("Seu CPF já estava cadastrado.");
     else toast.error("Não foi possível cadastrar o CPF.");
     if (outcome !== "error") onRegistered?.();
   }
@@ -71,7 +89,9 @@ export function CpfRegistrationForm({
       {returnTo ? (
         <Alert>
           <AlertTitle>Cadastre seu CPF para continuar</AlertTitle>
-          <AlertDescription>Depois do cadastro você pode voltar e concluir a reserva.</AlertDescription>
+          <AlertDescription>
+            Depois do cadastro você pode voltar e concluir a reserva.
+          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -91,12 +111,23 @@ export function CpfRegistrationForm({
             aria-invalid={showInvalid || undefined}
             aria-describedby="cpf-help"
           />
-          <p id="cpf-help" className={showInvalid ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
-            {showInvalid ? "CPF inválido. Confira os números digitados." : "Digite apenas os números; a máscara é automática."}
+          <p
+            id="cpf-help"
+            className={
+              showInvalid
+                ? "text-sm text-destructive"
+                : "text-sm text-muted-foreground"
+            }
+          >
+            {showInvalid
+              ? "CPF inválido. Confira os números digitados."
+              : "Digite apenas os números; a máscara é automática."}
           </p>
         </div>
         <Button type="submit" disabled={loading || !valid}>
-          {loading ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+          {loading ? (
+            <Loader2Icon className="animate-spin" aria-hidden />
+          ) : null}
           {loading ? "Cadastrando..." : "Cadastrar CPF"}
         </Button>
       </form>
@@ -127,12 +158,19 @@ function RegisteredCpf({
         <LockIcon className="size-4 text-muted-foreground" aria-hidden />
         <span className="text-sm text-muted-foreground">CPF cadastrado</span>
         {masked ? (
-          <span className="font-mono text-base font-medium tracking-wide">{masked}</span>
+          <span className="font-mono text-base font-medium tracking-wide">
+            {masked}
+          </span>
         ) : null}
       </div>
-      <p className="text-sm text-muted-foreground">{message ?? "Vinculado a esta conta e não pode ser alterado."}</p>
+      <p className="text-sm text-muted-foreground">
+        {message ?? "Vinculado a esta conta e não pode ser alterado."}
+      </p>
       {returnTo ? (
-        <Link href={returnTo} className="text-sm font-medium underline underline-offset-4">
+        <Link
+          href={returnTo}
+          className="text-sm font-medium underline underline-offset-4"
+        >
           Voltar e reservar ingresso
         </Link>
       ) : null}
@@ -150,7 +188,8 @@ export function CpfForm(props: CpfFormProps) {
         <CardTitle>CPF</CardTitle>
         {props.registered ? null : (
           <CardDescription>
-            {CPF_RULES_TEXT} Ele é cadastrado uma única vez e <strong>não pode ser alterado depois</strong>.
+            {CPF_RULES_TEXT} Ele é cadastrado uma única vez e{" "}
+            <strong>não pode ser alterado depois</strong>.
           </CardDescription>
         )}
       </CardHeader>

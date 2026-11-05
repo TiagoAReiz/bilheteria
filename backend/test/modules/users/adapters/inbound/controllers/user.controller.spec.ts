@@ -63,7 +63,10 @@ describe('UserController', () => {
 
   describe('me', () => {
     it('retorna o usuário da sessão com hasCpf e o CPF mascarado', async () => {
-      userService.getCpfStatus.mockResolvedValue({ hasCpf: true, cpfMasked: '***.982.247-**' });
+      userService.getCpfStatus.mockResolvedValue({
+        hasCpf: true,
+        cpfMasked: '***.982.247-**',
+      });
       await expect(controller.me(session)).resolves.toEqual({
         ...session.user,
         hasCpf: true,
@@ -74,8 +77,14 @@ describe('UserController', () => {
     });
 
     it('hasCpf false quando a conta ainda não tem CPF', async () => {
-      userService.getCpfStatus.mockResolvedValue({ hasCpf: false, cpfMasked: null });
-      await expect(controller.me(session)).resolves.toMatchObject({ hasCpf: false, cpfMasked: null });
+      userService.getCpfStatus.mockResolvedValue({
+        hasCpf: false,
+        cpfMasked: null,
+      });
+      await expect(controller.me(session)).resolves.toMatchObject({
+        hasCpf: false,
+        cpfMasked: null,
+      });
     });
 
     it('é mapeada em GET /users/me', () => {
@@ -142,10 +151,15 @@ describe('UserController', () => {
     });
 
     it('sempre usa o id da sessão', async () => {
-      await controller.createAvatarUpload(session, { content_type: 'image/webp' });
+      await controller.createAvatarUpload(session, {
+        content_type: 'image/webp',
+      });
       await controller.confirmAvatar(session, { key: 'k' });
       await controller.removeAvatar(session);
-      expect(userService.createAvatarUpload).toHaveBeenCalledWith('user-1', 'image/webp');
+      expect(userService.createAvatarUpload).toHaveBeenCalledWith(
+        'user-1',
+        'image/webp',
+      );
       expect(userService.confirmAvatar).toHaveBeenCalledWith('user-1', 'k');
       expect(userService.removeAvatar).toHaveBeenCalledWith('user-1');
     });

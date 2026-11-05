@@ -16,20 +16,20 @@ A API precisa estar rodando (padrão `http://localhost:3000`) com `FRONTEND_URL=
 
 ## Variáveis de ambiente
 
-| Variável | Padrão | Uso |
-| --- | --- | --- |
+| Variável              | Padrão                  | Uso                                                 |
+| --------------------- | ----------------------- | --------------------------------------------------- |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | URL base da API NestJS (usada pela instância axios) |
 
 ## Scripts
 
-| Script | O que faz |
-| --- | --- |
-| `npm run dev` | servidor de desenvolvimento na porta **3001** |
-| `npm run build` | build de produção |
-| `npm run start` | sobe o build de produção na porta **3001** |
-| `npm run lint` | ESLint (config do Next) |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | testes com Jest (`npm run test:watch` para modo watch) |
+| Script              | O que faz                                              |
+| ------------------- | ------------------------------------------------------ |
+| `npm run dev`       | servidor de desenvolvimento na porta **3001**          |
+| `npm run build`     | build de produção                                      |
+| `npm run start`     | sobe o build de produção na porta **3001**             |
+| `npm run lint`      | ESLint (config do Next)                                |
+| `npm run typecheck` | `tsc --noEmit`                                         |
+| `npm test`          | testes com Jest (`npm run test:watch` para modo watch) |
 
 ## Organização de pastas
 

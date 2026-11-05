@@ -3,7 +3,10 @@
 import { useCallback, useState } from "react";
 import { getErrorMessage, getErrorStatus } from "@/shared/lib/api-error";
 import { editEventService } from "../services/edit-event.service";
-import type { UpdateEventRequest, UpdateEventResponse } from "../types/edit-event.dto";
+import type {
+  UpdateEventRequest,
+  UpdateEventResponse,
+} from "../types/edit-event.dto";
 
 export type UpdateEventResult =
   | { ok: true; event: UpdateEventResponse }
@@ -16,7 +19,10 @@ export function useUpdateEvent(eventId: number) {
     async (body: UpdateEventRequest): Promise<UpdateEventResult> => {
       setLoading(true);
       try {
-        return { ok: true, event: await editEventService.update(eventId, body) };
+        return {
+          ok: true,
+          event: await editEventService.update(eventId, body),
+        };
       } catch (err) {
         const status = getErrorStatus(err);
         const message =

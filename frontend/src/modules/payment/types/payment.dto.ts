@@ -1,5 +1,6 @@
 /** Status de um pagamento na API (GET /payments/:id). */
-export type PaymentStatus = "pending" | "approved" | "rejected" | "cancelled" | "expired" | "refunded";
+export type PaymentStatus =
+  "pending" | "approved" | "rejected" | "cancelled" | "expired" | "refunded";
 
 /** Body de POST /payments/checkout. O valor não vai do front: é o preço do evento. */
 export interface CheckoutRequest {

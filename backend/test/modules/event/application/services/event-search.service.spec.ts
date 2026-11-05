@@ -11,7 +11,10 @@ import {
 } from '../../../../../src/modules/event/application/ports/outbound/search/event-search.port.js';
 import type { EventSearchCriteria } from '../../../../../src/modules/event/core/entities/event-search.entity.js';
 import { IMAGE_STORAGE_SERVICE } from '../../../../../src/modules/storage/application/ports/inbound/services/image-storage.service.port.js';
-import { mockImageStorage, PUBLIC_BASE } from '../../../../utils/image-storage.js';
+import {
+  mockImageStorage,
+  PUBLIC_BASE,
+} from '../../../../utils/image-storage.js';
 
 const NOW = new Date('2026-06-15T12:00:00.000Z');
 const criteria: EventSearchCriteria = {

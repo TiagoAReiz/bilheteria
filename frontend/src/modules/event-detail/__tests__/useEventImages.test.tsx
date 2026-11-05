@@ -22,9 +22,20 @@ jest.mock("../services/event-images.service", () => ({
 }));
 const svc = jest.mocked(eventImagesService);
 
-const photo = (id: number, position: number): EventPhoto => ({ id, url: `http://cdn/p${id}.png`, position });
-const png = () => new File([new Uint8Array([0x89, 0x50])], "foto.png", { type: "image/png" });
-const presigned = (key: string) => ({ url: "http://s3/b", fields: {}, key, max_bytes: 1, expires_at: "" });
+const photo = (id: number, position: number): EventPhoto => ({
+  id,
+  url: `http://cdn/p${id}.png`,
+  position,
+});
+const png = () =>
+  new File([new Uint8Array([0x89, 0x50])], "foto.png", { type: "image/png" });
+const presigned = (key: string) => ({
+  url: "http://s3/b",
+  fields: {},
+  key,
+  max_bytes: 1,
+  expires_at: "",
+});
 
 function setup(photos: EventPhoto[] = [], cover_url: string | null = null) {
   return renderHook(() => useEventImages(7, { cover_url, photos }));
@@ -57,7 +68,9 @@ describe("useEventImages", () => {
 
   it("uploadCover: presign da capa do evento, envio, confirmação e capa nova na tela", async () => {
     svc.createCoverUpload.mockResolvedValue(presigned("events/7/cover/a.png"));
-    svc.confirmCover.mockResolvedValue({ cover_url: "http://cdn/events/7/cover/a.png" });
+    svc.confirmCover.mockResolvedValue({
+      cover_url: "http://cdn/events/7/cover/a.png",
+    });
     const { result } = setup();
 
     let failure: unknown;
@@ -72,7 +85,9 @@ describe("useEventImages", () => {
   });
 
   it("uploadCover com erro mantém a capa e devolve a mensagem", async () => {
-    svc.createCoverUpload.mockRejectedValue(nestError(403, "Só o organizador do evento pode alterar as imagens dele"));
+    svc.createCoverUpload.mockRejectedValue(
+      nestError(403, "Só o organizador do evento pode alterar as imagens dele"),
+    );
     const { result } = setup([], "http://cdn/antiga.png");
 
     let failure: unknown;
@@ -80,9 +95,13 @@ describe("useEventImages", () => {
       failure = await result.current.uploadCover(png());
     });
 
-    expect(failure).toBe("Só o organizador do evento pode alterar as imagens dele");
+    expect(failure).toBe(
+      "Só o organizador do evento pode alterar as imagens dele",
+    );
     expect(result.current.coverUrl).toBe("http://cdn/antiga.png");
-    expect(result.current.error).toBe("Só o organizador do evento pode alterar as imagens dele");
+    expect(result.current.error).toBe(
+      "Só o organizador do evento pode alterar as imagens dele",
+    );
   });
 
   it("addPhoto troca a galeria pela resposta da API", async () => {
@@ -99,7 +118,9 @@ describe("useEventImages", () => {
   });
 
   it("addPhoto com a galeria cheia (409) não muda nada", async () => {
-    svc.createPhotoUpload.mockRejectedValue(nestError(409, "A galeria aceita no máximo 10 fotos"));
+    svc.createPhotoUpload.mockRejectedValue(
+      nestError(409, "A galeria aceita no máximo 10 fotos"),
+    );
     const { result } = setup([photo(1, 0)]);
 
     let failure: unknown;
@@ -148,7 +169,9 @@ describe("useEventImages", () => {
   });
 
   it("erro ao remover vira mensagem e mantém a foto", async () => {
-    svc.removePhoto.mockRejectedValue(nestError(404, "A foto 1 não foi encontrada neste evento"));
+    svc.removePhoto.mockRejectedValue(
+      nestError(404, "A foto 1 não foi encontrada neste evento"),
+    );
     const { result } = setup([photo(1, 0)]);
 
     let failure: unknown;

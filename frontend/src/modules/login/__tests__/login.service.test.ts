@@ -5,8 +5,12 @@ jest.mock("@/shared/services/api", () => ({ api: { post: jest.fn() } }));
 
 describe("loginService", () => {
   it("signInSocial envia provider e callbackURL", async () => {
-    jest.mocked(api.post).mockResolvedValue({ data: { url: "https://accounts.google.com/x", redirect: true } });
-    await expect(loginService.signInSocial("google", "http://localhost:3001/")).resolves.toEqual({
+    jest.mocked(api.post).mockResolvedValue({
+      data: { url: "https://accounts.google.com/x", redirect: true },
+    });
+    await expect(
+      loginService.signInSocial("google", "http://localhost:3001/"),
+    ).resolves.toEqual({
       url: "https://accounts.google.com/x",
       redirect: true,
     });

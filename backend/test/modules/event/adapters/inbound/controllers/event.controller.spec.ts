@@ -148,7 +148,9 @@ describe('EventController', () => {
   describe('update', () => {
     it('repassa o editor da sessão e só os campos editáveis', async () => {
       eventService.updateEvent.mockResolvedValue(event);
-      const adminSession = { user: { id: 'adm', role: 'ADMIN' } } as unknown as UserSession;
+      const adminSession = {
+        user: { id: 'adm', role: 'ADMIN' },
+      } as unknown as UserSession;
       const body = {
         name: 'Novo',
         max_tickets_per_cpf: 4,
@@ -156,7 +158,9 @@ describe('EventController', () => {
         available_tickets: 999,
       } as unknown as UpdateEventDto;
 
-      await expect(controller.update(adminSession, 1, body)).resolves.toBe(event);
+      await expect(controller.update(adminSession, 1, body)).resolves.toBe(
+        event,
+      );
       expect(eventService.updateEvent).toHaveBeenCalledWith(
         1,
         { id: 'adm', role: 'ADMIN' },
@@ -177,7 +181,9 @@ describe('EventController', () => {
       expect(reflector.get(ROLES_KEY, handler)).toEqual(['ORGANIZER', 'ADMIN']);
       expect(reflector.get(PUBLIC_KEY, handler)).toBeUndefined();
       expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(':id');
-      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.PATCH);
+      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
+        RequestMethod.PATCH,
+      );
     });
   });
 });

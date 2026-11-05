@@ -2,11 +2,13 @@ include:
   - infra/search/compose.search.yaml   # Elasticsearch + Sequin (busca por CDC)
   - infra/payment/compose.payment.yaml # túnel do webhook do Mercado Pago (profile tunnel)
   - infra/storage/compose.storage.yaml # S3 (LocalStack) das imagens de eventos e avatares
+  - infra/email/compose.email.yaml     # Mailpit: caixa de entrada local dos emails da API
 
 services:
 
   db:
-    image: postgres
+    # versão fixa: a imagem sem tag virou a 18, e trocar de major exige migrar os dados (pg_upgrade)
+    image: postgres:18.6
     restart: always
     # wal_level=logical: o Sequin lê as mudanças de event/ticket pelo WAL (CDC).
     # max_slot_wal_keep_size: teto de WAL que o slot pode reter se o Sequin ficar parado.
@@ -17,6 +19,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+    # volume COM NOME: sem ele o Postgres grava num volume anônimo, que o `docker compose down`
+    # apaga junto com o contêiner (os dados somem). A partir do 18 o diretório é /var/lib/postgresql.
+    volumes:
+      - postgres-data:/var/lib/postgresql
 
   # ---------------------------------------------------------------------------
   # Observabilidade (Grafana LGTM). Configs em infra/. Fluxo:
@@ -129,6 +135,7 @@ services:
       - tempo
 
 volumes:
+  postgres-data:
   alloy-data:
   prometheus-data:
   loki-data:

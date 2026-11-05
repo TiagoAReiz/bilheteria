@@ -3,7 +3,9 @@ import { makeEvent, nestError } from "@test/helpers";
 import { useEvents } from "../hooks/useEvents";
 import { eventsService } from "../services/events.service";
 
-jest.mock("../services/events.service", () => ({ eventsService: { listUpcoming: jest.fn() } }));
+jest.mock("../services/events.service", () => ({
+  eventsService: { listUpcoming: jest.fn() },
+}));
 const listUpcoming = jest.mocked(eventsService.listUpcoming);
 
 describe("useEvents", () => {
@@ -30,7 +32,9 @@ describe("useEvents", () => {
   });
 
   it("reload busca novamente", async () => {
-    listUpcoming.mockRejectedValueOnce(nestError(500, "x")).mockResolvedValueOnce([makeEvent()]);
+    listUpcoming
+      .mockRejectedValueOnce(nestError(500, "x"))
+      .mockResolvedValueOnce([makeEvent()]);
     const { result } = renderHook(() => useEvents());
     await waitFor(() => expect(result.current.error).toBe("x"));
 

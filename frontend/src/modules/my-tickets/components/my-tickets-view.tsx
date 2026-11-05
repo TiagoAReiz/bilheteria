@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { TicketIcon, TriangleAlertIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useMyTickets } from "../hooks/useMyTickets";
@@ -31,7 +35,12 @@ export function MyTicketsView() {
           <AlertTitle>Não foi possível carregar suas reservas</AlertTitle>
           <AlertDescription>
             <p>{error}</p>
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => void reload()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => void reload()}
+            >
               Tentar de novo
             </Button>
           </AlertDescription>
@@ -39,7 +48,9 @@ export function MyTicketsView() {
       ) : tickets.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">
           <TicketIcon className="size-8 text-muted-foreground" aria-hidden />
-          <p className="text-sm text-muted-foreground">Você ainda não tem ingressos.</p>
+          <p className="text-sm text-muted-foreground">
+            Você ainda não tem ingressos.
+          </p>
           <Button asChild>
             <Link href="/">Ver eventos</Link>
           </Button>

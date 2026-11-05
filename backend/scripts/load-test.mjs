@@ -38,7 +38,9 @@ async function round(n) {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, n) }, worker));
 
   const secs = (performance.now() - started) / 1000;
-  console.log(`\n== ${n} requests em ${secs.toFixed(2)}s (${(n / secs).toFixed(0)} req/s)`);
+  console.log(
+    `\n== ${n} requests em ${secs.toFixed(2)}s (${(n / secs).toFixed(0)} req/s)`,
+  );
   console.log('   status:', counts);
   return counts;
 }
@@ -57,7 +59,9 @@ const check = (name, ok, detail = '') => {
 const before = await getStatus();
 console.log('status inicial:', before);
 if (before.available === 0) {
-  console.log('Nenhum ingresso disponivel para o evento; reinicie a API/seed antes de rodar.');
+  console.log(
+    'Nenhum ingresso disponivel para o evento; reinicie a API/seed antes de rodar.',
+  );
   process.exit(1);
 }
 
@@ -65,15 +69,36 @@ let accepted = 0;
 for (const n of ROUNDS) {
   const counts = await round(n);
   accepted += (counts[201] ?? 0) + (counts[200] ?? 0);
-  check('sem erro 5xx/rede', !Object.keys(counts).some((s) => s === 'network-error' || s.startsWith('5')), JSON.stringify(counts));
+  check(
+    'sem erro 5xx/rede',
+    !Object.keys(counts).some(
+      (s) => s === 'network-error' || s.startsWith('5'),
+    ),
+    JSON.stringify(counts),
+  );
 }
 
 const after = await getStatus();
 console.log('\nstatus final:', after);
 check('total constante', after.total === before.total, `(${after.total})`);
-check('available + reserved = total', after.available + after.reserved === after.total);
-check('nunca reserva acima da capacidade', after.reserved <= after.total, `(${after.reserved}/${after.total})`);
-check('reservas novas <= disponiveis no inicio', after.reserved - before.reserved <= before.available, `(${after.reserved - before.reserved}/${before.available})`);
-check('reservas aceitas = reserved (sem overbooking)', accepted === after.reserved - before.reserved, `(aceitas=${accepted}, delta=${after.reserved - before.reserved})`);
+check(
+  'available + reserved = total',
+  after.available + after.reserved === after.total,
+);
+check(
+  'nunca reserva acima da capacidade',
+  after.reserved <= after.total,
+  `(${after.reserved}/${after.total})`,
+);
+check(
+  'reservas novas <= disponiveis no inicio',
+  after.reserved - before.reserved <= before.available,
+  `(${after.reserved - before.reserved}/${before.available})`,
+);
+check(
+  'reservas aceitas = reserved (sem overbooking)',
+  accepted === after.reserved - before.reserved,
+  `(aceitas=${accepted}, delta=${after.reserved - before.reserved})`,
+);
 
 process.exit(checks.every(Boolean) ? 0 : 1);

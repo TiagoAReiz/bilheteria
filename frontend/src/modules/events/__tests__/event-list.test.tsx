@@ -4,7 +4,9 @@ import { makeEvent, nestError } from "@test/helpers";
 import { EventList } from "../components/event-list";
 import { eventsService } from "../services/events.service";
 
-jest.mock("../services/events.service", () => ({ eventsService: { listUpcoming: jest.fn() } }));
+jest.mock("../services/events.service", () => ({
+  eventsService: { listUpcoming: jest.fn() },
+}));
 const listUpcoming = jest.mocked(eventsService.listUpcoming);
 
 describe("<EventList />", () => {
@@ -18,7 +20,12 @@ describe("<EventList />", () => {
 
   it("renderiza os cards com nome, local, data pt-BR e link", async () => {
     listUpcoming.mockResolvedValue([
-      makeEvent({ id: 7, name: "Festival de Jazz", location: "Parque Ibirapuera", starts_at: "2099-05-10T22:00:00.000Z" }),
+      makeEvent({
+        id: 7,
+        name: "Festival de Jazz",
+        location: "Parque Ibirapuera",
+        starts_at: "2099-05-10T22:00:00.000Z",
+      }),
       makeEvent({ id: 8, name: "Peça de Teatro" }),
     ]);
     render(<EventList />);
@@ -35,29 +42,40 @@ describe("<EventList />", () => {
   it("mostra mensagem quando não há eventos", async () => {
     listUpcoming.mockResolvedValue([]);
     render(<EventList />);
-    expect(await screen.findByText("Nenhum evento programado no momento.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Nenhum evento programado no momento."),
+    ).toBeInTheDocument();
   });
 
   it("mostra o erro e permite tentar novamente", async () => {
-    listUpcoming.mockRejectedValueOnce(nestError(500, "Serviço indisponível")).mockResolvedValueOnce([makeEvent()]);
+    listUpcoming
+      .mockRejectedValueOnce(nestError(500, "Serviço indisponível"))
+      .mockResolvedValueOnce([makeEvent()]);
     render(<EventList />);
 
     expect(await screen.findByText("Serviço indisponível")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Tentar novamente" }),
+    );
     expect(await screen.findByText("Show de Rock")).toBeInTheDocument();
   });
 
   it("mostra a capa no card quando o evento tem uma", async () => {
     listUpcoming.mockResolvedValue([
-      makeEvent({ id: 1, name: "Com capa", cover_url: "http://cdn/events/1/cover/a.png" }),
+      makeEvent({
+        id: 1,
+        name: "Com capa",
+        cover_url: "http://cdn/events/1/cover/a.png",
+      }),
       makeEvent({ id: 2, name: "Sem capa", cover_url: null }),
     ]);
     render(<EventList />);
 
-    expect(await screen.findByRole("img", { name: "Capa de Com capa" })).toHaveAttribute(
-      "src",
-      "http://cdn/events/1/cover/a.png",
-    );
-    expect(screen.queryByRole("img", { name: "Capa de Sem capa" })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("img", { name: "Capa de Com capa" }),
+    ).toHaveAttribute("src", "http://cdn/events/1/cover/a.png");
+    expect(
+      screen.queryByRole("img", { name: "Capa de Sem capa" }),
+    ).not.toBeInTheDocument();
   });
 });

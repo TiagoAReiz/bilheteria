@@ -22,7 +22,10 @@ export function EventGallery({
   const editable = Boolean(onMove && onRemove);
 
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Galeria de fotos">
+    <ul
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+      aria-label="Galeria de fotos"
+    >
       {photos.map((photo, index) => (
         <li key={photo.id} className="space-y-2">
           {/* eslint-disable-next-line @next/next/no-img-element -- imagem do bucket (S3/LocalStack), sem otimização do Next */}

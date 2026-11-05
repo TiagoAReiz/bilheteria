@@ -7,7 +7,9 @@ import type { NewEventFormValues } from "@/modules/new-event/types/new-event.sch
  * Body de PATCH /events/:id: só os campos enviados mudam. `description: null` apaga a descrição.
  * Capacidade e limite por CPF só podem aumentar (409 se diminuírem).
  */
-export type UpdateEventRequest = Partial<Omit<CreateEventRequest, "description">> & {
+export type UpdateEventRequest = Partial<
+  Omit<CreateEventRequest, "description">
+> & {
   description?: string | null;
 };
 
@@ -15,7 +17,9 @@ export type UpdateEventRequest = Partial<Omit<CreateEventRequest, "description">
 export type UpdateEventResponse = EventResponse;
 
 /** O formulário de edição manda todos os campos (o backend ignora os que não mudaram). */
-export function toUpdateEventRequest(values: NewEventFormValues): UpdateEventRequest {
+export function toUpdateEventRequest(
+  values: NewEventFormValues,
+): UpdateEventRequest {
   return {
     name: values.name,
     description: values.description ? values.description : null,

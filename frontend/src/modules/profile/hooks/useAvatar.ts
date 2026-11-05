@@ -14,7 +14,8 @@ export function useAvatar(onChanged?: () => Promise<void> | void) {
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const { upload, uploading, error } = useImageUpload({
-    requestUpload: (type: ImageContentType) => profileService.createAvatarUpload(type),
+    requestUpload: (type: ImageContentType) =>
+      profileService.createAvatarUpload(type),
     confirm: (key: string) => profileService.confirmAvatar(key),
   });
 

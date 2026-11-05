@@ -15,7 +15,10 @@ export interface AsyncState<T> {
  * Executa `fn` ao montar e sempre que `key` mudar, expondo dados/erro/loading.
  * `fn` pode ser uma arrow inline: a versão mais recente é guardada num ref.
  */
-export function useAsync<T>(fn: () => Promise<T>, key: string | number = ""): AsyncState<T> {
+export function useAsync<T>(
+  fn: () => Promise<T>,
+  key: string | number = "",
+): AsyncState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

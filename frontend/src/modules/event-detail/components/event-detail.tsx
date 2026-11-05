@@ -2,12 +2,29 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, BanknoteIcon, CalendarIcon, MapPinIcon, PencilIcon, TicketIcon, UsersIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  BanknoteIcon,
+  CalendarIcon,
+  MapPinIcon,
+  PencilIcon,
+  TicketIcon,
+  UsersIcon,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/card";
 import { Separator } from "@/shared/components/ui/separator";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useSession } from "@/shared/hooks/useSession";
@@ -16,15 +33,23 @@ import { formatBRL } from "@/shared/lib/money";
 import type { User } from "@/shared/types/user";
 import { useEventDetail } from "../hooks/useEventDetail";
 import { useEventImages } from "../hooks/useEventImages";
-import type { EventDetailResponse, TicketStatusResponse } from "../types/event-detail.dto";
+import type {
+  EventDetailResponse,
+  TicketStatusResponse,
+} from "../types/event-detail.dto";
 import { EventGallery } from "./event-gallery";
 import { EventImagesToolbar } from "./event-images-toolbar";
 import { ReserveTicketButton } from "./reserve-ticket-button";
 import { TicketStatusCard } from "./ticket-status-card";
 
 /** Só o organizador que criou o evento (ou um ADMIN) mexe nas imagens; a API confere de novo. */
-export function canEditEventImages(user: Pick<User, "id" | "role"> | null, event: Pick<EventDetailResponse, "organizer_id">) {
-  return Boolean(user && (user.role === "ADMIN" || user.id === event.organizer_id));
+export function canEditEventImages(
+  user: Pick<User, "id" | "role"> | null,
+  event: Pick<EventDetailResponse, "organizer_id">,
+) {
+  return Boolean(
+    user && (user.role === "ADMIN" || user.id === event.organizer_id),
+  );
 }
 
 async function toastFailure(operation: Promise<string | null>) {
@@ -41,8 +66,16 @@ const backLink = (
 );
 
 export function EventDetail({ eventId }: { eventId: number }) {
-  const { event, loading, error, notFound, ticketStatus, ticketStatusLoading, ticketStatusError, reloadTicketStatus } =
-    useEventDetail(eventId);
+  const {
+    event,
+    loading,
+    error,
+    notFound,
+    ticketStatus,
+    ticketStatusLoading,
+    ticketStatusError,
+    reloadTicketStatus,
+  } = useEventDetail(eventId);
 
   if (loading) {
     return (
@@ -58,7 +91,11 @@ export function EventDetail({ eventId }: { eventId: number }) {
       <div className="space-y-4">
         {backLink}
         <Alert variant="destructive">
-          <AlertTitle>{notFound ? "Evento não encontrado" : "Não foi possível carregar o evento"}</AlertTitle>
+          <AlertTitle>
+            {notFound
+              ? "Evento não encontrado"
+              : "Não foi possível carregar o evento"}
+          </AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -92,7 +129,10 @@ function EventDetailContent({
   // momento em que a página foi aberta (usado para saber se o evento já começou)
   const [openedAt] = useState(() => Date.now());
   const { user } = useSession();
-  const images = useEventImages(event.id, { cover_url: event.cover_url, photos: event.photos ?? [] });
+  const images = useEventImages(event.id, {
+    cover_url: event.cover_url,
+    photos: event.photos ?? [],
+  });
   const canEdit = canEditEventImages(user, event);
 
   const started = new Date(event.starts_at).getTime() <= openedAt;
@@ -116,8 +156,12 @@ function EventDetailContent({
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-3xl">{event.name}</CardTitle>
             {soldOut ? <Badge variant="destructive">Esgotado</Badge> : null}
-            {started ? <Badge variant="secondary">Vendas encerradas</Badge> : null}
-            {notOnSale && !started ? <Badge variant="secondary">Vendas indisponíveis</Badge> : null}
+            {started ? (
+              <Badge variant="secondary">Vendas encerradas</Badge>
+            ) : null}
+            {notOnSale && !started ? (
+              <Badge variant="secondary">Vendas indisponíveis</Badge>
+            ) : null}
             {canEdit && !started ? (
               <Button asChild variant="outline" size="sm" className="ml-auto">
                 <Link href={`/events/${event.id}/edit`}>
@@ -132,10 +176,13 @@ function EventDetailContent({
             </p>
             <p className="flex items-center gap-2">
               <CalendarIcon className="size-4" aria-hidden />
-              <time dateTime={event.starts_at}>{formatDateTime(event.starts_at)}</time>
+              <time dateTime={event.starts_at}>
+                {formatDateTime(event.starts_at)}
+              </time>
             </p>
             <p className="flex items-center gap-2">
-              <UsersIcon className="size-4" aria-hidden /> Capacidade: {formatNumber(event.capacity)} pessoas
+              <UsersIcon className="size-4" aria-hidden /> Capacidade:{" "}
+              {formatNumber(event.capacity)} pessoas
             </p>
             <p className="flex items-center gap-2">
               <BanknoteIcon className="size-4" aria-hidden />
@@ -143,18 +190,25 @@ function EventDetailContent({
                 "Preço a definir"
               ) : (
                 <span>
-                  Ingresso: <strong className="text-foreground">{formatBRL(event.price_cents)}</strong>
+                  Ingresso:{" "}
+                  <strong className="text-foreground">
+                    {formatBRL(event.price_cents)}
+                  </strong>
                 </span>
               )}
             </p>
             <p className="flex items-center gap-2">
               <TicketIcon className="size-4" aria-hidden />
-              Limite de {event.max_tickets_per_cpf} {event.max_tickets_per_cpf === 1 ? "ingresso" : "ingressos"} por CPF
+              Limite de {event.max_tickets_per_cpf}{" "}
+              {event.max_tickets_per_cpf === 1 ? "ingresso" : "ingressos"} por
+              CPF
             </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {event.description ? <p className="whitespace-pre-line">{event.description}</p> : null}
+          {event.description ? (
+            <p className="whitespace-pre-line">{event.description}</p>
+          ) : null}
           {canEdit ? <EventImagesToolbar images={images} /> : null}
           {images.photos.length > 0 ? (
             <section className="space-y-3">
@@ -163,15 +217,28 @@ function EventDetailContent({
                 photos={images.photos}
                 eventName={event.name}
                 disabled={images.busy}
-                onMove={canEdit ? (id, direction) => void toastFailure(images.movePhoto(id, direction)) : undefined}
-                onRemove={canEdit ? (id) => void toastFailure(images.removePhoto(id)) : undefined}
+                onMove={
+                  canEdit
+                    ? (id, direction) =>
+                        void toastFailure(images.movePhoto(id, direction))
+                    : undefined
+                }
+                onRemove={
+                  canEdit
+                    ? (id) => void toastFailure(images.removePhoto(id))
+                    : undefined
+                }
               />
             </section>
           ) : null}
           <Separator />
           <section className="space-y-3">
             <h2 className="font-semibold">Ingressos</h2>
-            <TicketStatusCard status={ticketStatus} loading={ticketStatusLoading} error={ticketStatusError} />
+            <TicketStatusCard
+              status={ticketStatus}
+              loading={ticketStatusLoading}
+              error={ticketStatusError}
+            />
           </section>
           <ReserveTicketButton
             eventId={event.id}

@@ -6,7 +6,10 @@ describe("useDebouncedValue", () => {
   afterEach(() => jest.useRealTimers());
 
   it("só atualiza depois do intervalo sem mudanças", () => {
-    const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 200), { initialProps: { value: "a" } });
+    const { result, rerender } = renderHook(
+      ({ value }) => useDebouncedValue(value, 200),
+      { initialProps: { value: "a" } },
+    );
 
     rerender({ value: "ab" });
     act(() => jest.advanceTimersByTime(150));

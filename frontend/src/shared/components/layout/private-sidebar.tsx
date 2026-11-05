@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarIcon, CalendarPlusIcon, LogOutIcon, TicketIcon, UserIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  CalendarPlusIcon,
+  LogOutIcon,
+  TicketIcon,
+  UserIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/shared/components/ui/button";
 import { useSession } from "@/shared/hooks/useSession";
@@ -49,7 +55,11 @@ export function PrivateSidebar() {
             {label}
           </Link>
         ))}
-        <Button variant="ghost" className="justify-start gap-2 px-3 md:mt-auto" onClick={handleSignOut}>
+        <Button
+          variant="ghost"
+          className="justify-start gap-2 px-3 md:mt-auto"
+          onClick={handleSignOut}
+        >
           <LogOutIcon className="size-4" aria-hidden />
           Sair
         </Button>

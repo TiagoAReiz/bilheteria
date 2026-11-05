@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { eventSearchService } from "../services/event-search.service";
-import { SUGGEST_DEBOUNCE_MS, SUGGEST_MIN_CHARS, type EventSuggestion } from "../types/event-search.dto";
+import {
+  SUGGEST_DEBOUNCE_MS,
+  SUGGEST_MIN_CHARS,
+  type EventSuggestion,
+} from "../types/event-search.dto";
 
 interface SuggestionsState {
   query: string;
@@ -18,7 +22,10 @@ interface SuggestionsState {
 export function useEventSuggestions(query: string) {
   const debounced = useDebouncedValue(query.trim(), SUGGEST_DEBOUNCE_MS);
   const enabled = debounced.length >= SUGGEST_MIN_CHARS;
-  const [state, setState] = useState<SuggestionsState>({ query: "", items: [] });
+  const [state, setState] = useState<SuggestionsState>({
+    query: "",
+    items: [],
+  });
 
   useEffect(() => {
     if (!enabled) return;
@@ -26,7 +33,8 @@ export function useEventSuggestions(query: string) {
     eventSearchService.suggest(debounced, controller.signal).then(
       (items) => setState({ query: debounced, items }),
       () => {
-        if (!controller.signal.aborted) setState({ query: debounced, items: [] });
+        if (!controller.signal.aborted)
+          setState({ query: debounced, items: [] });
       },
     );
     return () => controller.abort();

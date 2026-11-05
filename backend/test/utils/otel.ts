@@ -41,10 +41,7 @@ export const createInMemoryMetrics = (): InMemoryMetrics => {
   };
 };
 
-export const findMetric = (
-  metrics: MetricData[],
-  name: string,
-): MetricData => {
+export const findMetric = (metrics: MetricData[], name: string): MetricData => {
   const metric = metrics.find((m) => m.descriptor.name === name);
   if (!metric) {
     throw new Error(

@@ -8,7 +8,10 @@ import { paymentService } from "../services/payment.service";
 /** Abre o checkout no backend e leva o navegador para a página do Mercado Pago. */
 export function useCheckout(ticketId: number) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<{ status?: number; message: string } | null>(null);
+  const [error, setError] = useState<{
+    status?: number;
+    message: string;
+  } | null>(null);
 
   const pay = useCallback(async () => {
     setLoading(true);
@@ -19,7 +22,10 @@ export function useCheckout(ticketId: number) {
       hardRedirect(checkout.checkout_url);
       return true;
     } catch (err) {
-      setError({ status: getErrorStatus(err), message: getErrorMessage(err, "Não foi possível abrir o pagamento.") });
+      setError({
+        status: getErrorStatus(err),
+        message: getErrorMessage(err, "Não foi possível abrir o pagamento."),
+      });
       setLoading(false);
       return false;
     }

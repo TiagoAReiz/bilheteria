@@ -99,9 +99,9 @@ describe('CreateEventDto', () => {
 
   describe('capacity', () => {
     it.each([1, 100000])('aceita o limite %d', async (capacity) => {
-      await expect(errorsFor({ ...validBody(), capacity, max_tickets_per_cpf: 1 })).resolves.toEqual(
-        {},
-      );
+      await expect(
+        errorsFor({ ...validBody(), capacity, max_tickets_per_cpf: 1 }),
+      ).resolves.toEqual({});
     });
 
     it.each([
@@ -123,11 +123,14 @@ describe('CreateEventDto', () => {
   });
 
   describe('price_cents', () => {
-    it.each([100, 5000, 10_000_000])('aceita %d centavos', async (price_cents) => {
-      await expect(
-        errorsFor({ ...validBody(), price_cents }),
-      ).resolves.toEqual({});
-    });
+    it.each([100, 5000, 10_000_000])(
+      'aceita %d centavos',
+      async (price_cents) => {
+        await expect(
+          errorsFor({ ...validBody(), price_cents }),
+        ).resolves.toEqual({});
+      },
+    );
 
     it.each([
       [0, 'min'],
@@ -154,21 +157,31 @@ describe('CreateEventDto', () => {
     });
 
     it.each([0, 11, 1.5, '2'])('recusa %p', async (value) => {
-      expect(await errorsFor({ ...validBody(), max_tickets_per_cpf: value })).toHaveProperty(
-        'max_tickets_per_cpf',
-      );
+      expect(
+        await errorsFor({ ...validBody(), max_tickets_per_cpf: value }),
+      ).toHaveProperty('max_tickets_per_cpf');
     });
 
     it.each([1, 10])('aceita %p', async (value) => {
-      expect(await errorsFor({ ...validBody(), max_tickets_per_cpf: value })).toEqual({});
+      expect(
+        await errorsFor({ ...validBody(), max_tickets_per_cpf: value }),
+      ).toEqual({});
     });
 
     it('não pode passar da capacidade', async () => {
       expect(
-        await errorsFor({ ...validBody(), capacity: 3, max_tickets_per_cpf: 4 }),
+        await errorsFor({
+          ...validBody(),
+          capacity: 3,
+          max_tickets_per_cpf: 4,
+        }),
       ).toEqual({ max_tickets_per_cpf: ['notAboveCapacity'] });
       expect(
-        await errorsFor({ ...validBody(), capacity: 3, max_tickets_per_cpf: 3 }),
+        await errorsFor({
+          ...validBody(),
+          capacity: 3,
+          max_tickets_per_cpf: 3,
+        }),
       ).toEqual({});
     });
   });

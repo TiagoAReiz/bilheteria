@@ -18,7 +18,9 @@ describe('CpfDto', () => {
     async (cpf) => {
       const errors = await validateBody({ cpf });
       expect(errors).toHaveLength(1);
-      expect(Object.values(errors[0].constraints ?? {})).toContain('CPF inválido');
+      expect(Object.values(errors[0].constraints ?? {})).toContain(
+        'CPF inválido',
+      );
     },
   );
 

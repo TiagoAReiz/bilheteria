@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useEventSearch } from "../hooks/useEventSearch";
-import { EMPTY_FILTERS, type EventSearchFilters } from "../types/event-search.dto";
+import {
+  EMPTY_FILTERS,
+  type EventSearchFilters,
+} from "../types/event-search.dto";
 import { EventList } from "./event-list";
 import { EventSearchBar } from "./event-search-bar";
 import { EventSearchResults } from "./event-search-results";

@@ -3,9 +3,13 @@
 import { useCallback, useState } from "react";
 import { getErrorMessage, getErrorStatus } from "@/shared/lib/api-error";
 import { eventDetailService } from "../services/event-detail.service";
-import { RESERVATION_TTL_MINUTES, type TicketResponse } from "../types/event-detail.dto";
+import {
+  RESERVATION_TTL_MINUTES,
+  type TicketResponse,
+} from "../types/event-detail.dto";
 
-export type ReserveErrorKind = "cpf_required" | "conflict" | "not_found" | "unknown";
+export type ReserveErrorKind =
+  "cpf_required" | "conflict" | "not_found" | "unknown";
 
 export interface ReserveError {
   kind: ReserveErrorKind;
@@ -24,12 +28,17 @@ function classify(status: number | undefined): ReserveErrorKind {
   return "unknown";
 }
 
-export function getReservationExpiry(reservedAt: string | null, now = new Date()): Date {
+export function getReservationExpiry(
+  reservedAt: string | null,
+  now = new Date(),
+): Date {
   const base = reservedAt ? new Date(reservedAt) : now;
   return new Date(base.getTime() + RESERVATION_TTL_MINUTES * 60 * 1000);
 }
 
-export function isReserveError(value: ReserveResult | ReserveError): value is ReserveError {
+export function isReserveError(
+  value: ReserveResult | ReserveError,
+): value is ReserveError {
   return "kind" in value;
 }
 
@@ -38,12 +47,17 @@ export function useReserveTicket(eventId: number) {
   const [result, setResult] = useState<ReserveResult | null>(null);
   const [error, setError] = useState<ReserveError | null>(null);
 
-  const reserve = useCallback(async (): Promise<ReserveResult | ReserveError> => {
+  const reserve = useCallback(async (): Promise<
+    ReserveResult | ReserveError
+  > => {
     setLoading(true);
     setError(null);
     try {
       const ticket = await eventDetailService.reserveTicket(eventId);
-      const next: ReserveResult = { ticket, expiresAt: getReservationExpiry(ticket.reserved_at) };
+      const next: ReserveResult = {
+        ticket,
+        expiresAt: getReservationExpiry(ticket.reserved_at),
+      };
       setResult(next);
       return next;
     } catch (err) {
@@ -52,7 +66,10 @@ export function useReserveTicket(eventId: number) {
         kind: classify(status),
         message:
           status === 403
-            ? getErrorMessage(err, "Cadastre seu CPF antes de reservar ingressos.")
+            ? getErrorMessage(
+                err,
+                "Cadastre seu CPF antes de reservar ingressos.",
+              )
             : getErrorMessage(err, "Não foi possível reservar o ingresso."),
       };
       setError(next);

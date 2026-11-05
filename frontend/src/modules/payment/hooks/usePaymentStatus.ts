@@ -15,7 +15,10 @@ export const PAYMENT_POLL_MAX_ATTEMPTS = 40;
  */
 export function usePaymentStatus(paymentId: string | null) {
   const [payment, setPayment] = useState<PaymentResponse | null>(null);
-  const [error, setError] = useState<{ status?: number; message: string } | null>(null);
+  const [error, setError] = useState<{
+    status?: number;
+    message: string;
+  } | null>(null);
   const [loading, setLoading] = useState(paymentId !== null);
   const [gaveUp, setGaveUp] = useState(false);
   const [round, setRound] = useState(0);
@@ -41,7 +44,13 @@ export function usePaymentStatus(paymentId: string | null) {
         timer = window.setTimeout(() => void poll(), PAYMENT_POLL_INTERVAL_MS);
       } catch (err) {
         if (cancelled) return;
-        setError({ status: getErrorStatus(err), message: getErrorMessage(err, "Não foi possível consultar o pagamento.") });
+        setError({
+          status: getErrorStatus(err),
+          message: getErrorMessage(
+            err,
+            "Não foi possível consultar o pagamento.",
+          ),
+        });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -62,5 +71,12 @@ export function usePaymentStatus(paymentId: string | null) {
     setRound((r) => r + 1);
   };
 
-  return { payment, error, loading, polling: payment?.status === "pending" && !gaveUp, gaveUp, refresh };
+  return {
+    payment,
+    error,
+    loading,
+    polling: payment?.status === "pending" && !gaveUp,
+    gaveUp,
+    refresh,
+  };
 }

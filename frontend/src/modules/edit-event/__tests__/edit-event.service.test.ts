@@ -2,15 +2,21 @@ import { api } from "@/shared/services/api";
 import { editEventService } from "../services/edit-event.service";
 import { toUpdateEventRequest } from "../types/edit-event.dto";
 
-jest.mock("@/shared/services/api", () => ({ api: { get: jest.fn(), patch: jest.fn() } }));
+jest.mock("@/shared/services/api", () => ({
+  api: { get: jest.fn(), patch: jest.fn() },
+}));
 
 describe("editEventService", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("update faz PATCH /events/:id com o body", async () => {
     jest.mocked(api.patch).mockResolvedValue({ data: { id: 3 } });
-    await expect(editEventService.update(3, { max_tickets_per_cpf: 4 })).resolves.toEqual({ id: 3 });
-    expect(api.patch).toHaveBeenCalledWith("/events/3", { max_tickets_per_cpf: 4 });
+    await expect(
+      editEventService.update(3, { max_tickets_per_cpf: 4 }),
+    ).resolves.toEqual({ id: 3 });
+    expect(api.patch).toHaveBeenCalledWith("/events/3", {
+      max_tickets_per_cpf: 4,
+    });
   });
 
   it("getEvent faz GET /events/:id", async () => {

@@ -1,4 +1,8 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/shared/components/ui/avatar";
 import { initials } from "@/shared/lib/format";
 import type { User } from "@/shared/types/user";
 

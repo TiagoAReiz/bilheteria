@@ -15,7 +15,10 @@ export function useSocialSignIn(redirectPath: string) {
     async (provider: SocialProvider) => {
       setPending(provider);
       try {
-        const callbackURL = new URL(redirectPath, window.location.origin).toString();
+        const callbackURL = new URL(
+          redirectPath,
+          window.location.origin,
+        ).toString();
         const { url } = await loginService.signInSocial(provider, callbackURL);
         hardRedirect(url);
       } catch (err) {

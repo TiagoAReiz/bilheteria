@@ -12,7 +12,11 @@ const config = {
     "^@test/(.*)$": "<rootDir>/jest/$1",
   },
   testMatch: ["<rootDir>/src/**/__tests__/**/*.test.{ts,tsx}"],
-  collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/shared/components/ui/**", "!src/app/**"],
+  collectCoverageFrom: [
+    "src/**/*.{ts,tsx}",
+    "!src/shared/components/ui/**",
+    "!src/app/**",
+  ],
 };
 
 module.exports = createJestConfig(config);

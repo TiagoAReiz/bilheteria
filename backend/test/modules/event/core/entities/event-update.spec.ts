@@ -28,37 +28,94 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
 describe('checkEventUpdate', () => {
   it('aceita mudanças do dono num evento futuro', () => {
     expect(
-      checkEventUpdate(makeEvent(), { name: 'Outro', price_cents: 9000, capacity: 20, max_tickets_per_cpf: 4 }, owner, NOW),
+      checkEventUpdate(
+        makeEvent(),
+        {
+          name: 'Outro',
+          price_cents: 9000,
+          capacity: 20,
+          max_tickets_per_cpf: 4,
+        },
+        owner,
+        NOW,
+      ),
     ).toBeNull();
   });
 
   it('aceita manter capacidade e limite iguais', () => {
-    expect(checkEventUpdate(makeEvent(), { capacity: 10, max_tickets_per_cpf: 2 }, owner, NOW)).toBeNull();
+    expect(
+      checkEventUpdate(
+        makeEvent(),
+        { capacity: 10, max_tickets_per_cpf: 2 },
+        owner,
+        NOW,
+      ),
+    ).toBeNull();
   });
 
   it('outro organizador não edita; ADMIN edita', () => {
-    expect(checkEventUpdate(makeEvent(), { name: 'x' }, { id: 'org-2', role: 'ORGANIZER' }, NOW)).toBe('forbidden');
-    expect(checkEventUpdate(makeEvent(), { name: 'x' }, { id: 'adm', role: 'ADMIN' }, NOW)).toBeNull();
+    expect(
+      checkEventUpdate(
+        makeEvent(),
+        { name: 'x' },
+        { id: 'org-2', role: 'ORGANIZER' },
+        NOW,
+      ),
+    ).toBe('forbidden');
+    expect(
+      checkEventUpdate(
+        makeEvent(),
+        { name: 'x' },
+        { id: 'adm', role: 'ADMIN' },
+        NOW,
+      ),
+    ).toBeNull();
   });
 
   it('evento que já começou não muda', () => {
-    expect(checkEventUpdate(makeEvent({ starts_at: NOW }), { name: 'x' }, owner, NOW)).toBe('event_started');
+    expect(
+      checkEventUpdate(
+        makeEvent({ starts_at: NOW }),
+        { name: 'x' },
+        owner,
+        NOW,
+      ),
+    ).toBe('event_started');
   });
 
   it('capacidade não diminui', () => {
-    expect(checkEventUpdate(makeEvent(), { capacity: 9 }, owner, NOW)).toBe('capacity_decrease');
+    expect(checkEventUpdate(makeEvent(), { capacity: 9 }, owner, NOW)).toBe(
+      'capacity_decrease',
+    );
   });
 
   it('limite por CPF não diminui (escolha irreversível)', () => {
-    expect(checkEventUpdate(makeEvent({ max_tickets_per_cpf: 3 }), { max_tickets_per_cpf: 2 }, owner, NOW)).toBe(
-      'limit_decrease',
-    );
+    expect(
+      checkEventUpdate(
+        makeEvent({ max_tickets_per_cpf: 3 }),
+        { max_tickets_per_cpf: 2 },
+        owner,
+        NOW,
+      ),
+    ).toBe('limit_decrease');
   });
 
   it('limite não passa da capacidade (nova ou atual)', () => {
-    expect(checkEventUpdate(makeEvent({ capacity: 3 }), { max_tickets_per_cpf: 4 }, owner, NOW)).toBe(
-      'limit_above_capacity',
-    );
-    expect(checkEventUpdate(makeEvent({ capacity: 3 }), { capacity: 4, max_tickets_per_cpf: 4 }, owner, NOW)).toBeNull();
+    expect(
+      checkEventUpdate(
+        makeEvent({ capacity: 3 }),
+        { max_tickets_per_cpf: 4 },
+        owner,
+        NOW,
+      ),
+    ).toBe('limit_above_capacity');
+    expect(
+      checkEventUpdate(
+        makeEvent({ capacity: 3 }),
+        { capacity: 4, max_tickets_per_cpf: 4 },
+        owner,
+        NOW,
+      ),
+    ).toBeNull();
   });
 });

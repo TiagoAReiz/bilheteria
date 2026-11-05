@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { MockPort } from '../../../../utils/mocks.js';
 import { EventService } from '../../../../../src/modules/event/application/services/event.service.js';
@@ -13,7 +17,10 @@ import {
 import type { Event } from '../../../../../src/modules/event/core/entities/event.entity.js';
 import type { NewEvent } from '../../../../../src/modules/event/core/entities/new-event.entity.js';
 import { IMAGE_STORAGE_SERVICE } from '../../../../../src/modules/storage/application/ports/inbound/services/image-storage.service.port.js';
-import { mockImageStorage, PUBLIC_BASE } from '../../../../utils/image-storage.js';
+import {
+  mockImageStorage,
+  PUBLIC_BASE,
+} from '../../../../utils/image-storage.js';
 
 const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   id: 1,
@@ -78,7 +85,10 @@ describe('EventService', () => {
     eventRepository.createWithTickets.mockResolvedValue(created);
 
     const { cover_key: _cover, ...rest } = created;
-    await expect(service.createEvent(input)).resolves.toEqual({ ...rest, cover_url: null });
+    await expect(service.createEvent(input)).resolves.toEqual({
+      ...rest,
+      cover_url: null,
+    });
     expect(eventRepository.createWithTickets).toHaveBeenCalledWith(input);
     expect(metrics.eventCreated).toHaveBeenCalledTimes(1);
   });
@@ -111,7 +121,10 @@ describe('EventService', () => {
   });
 
   it('listUpcomingEvents troca a chave da capa pela URL pública', async () => {
-    const events = [makeEvent(), makeEvent({ id: 2, cover_key: 'events/2/cover/a.png' })];
+    const events = [
+      makeEvent(),
+      makeEvent({ id: 2, cover_key: 'events/2/cover/a.png' }),
+    ];
     eventRepository.getUpcomingEvents.mockResolvedValue(events);
 
     const listed = await service.listUpcomingEvents();
@@ -152,10 +165,22 @@ describe('EventService', () => {
   it('getEventDetail monta capa e galeria (em ordem) com URLs públicas', async () => {
     eventRepository.getEventWithPhotos.mockResolvedValue(
       Object.assign(makeEvent({ id: 3, cover_key: 'events/3/cover/c.webp' }), {
-      photos: [
-        { id: 9, event_id: 3, key: 'events/3/photos/b.png', position: 1, created_at: new Date() },
-        { id: 7, event_id: 3, key: 'events/3/photos/a.jpg', position: 0, created_at: new Date() },
-      ],
+        photos: [
+          {
+            id: 9,
+            event_id: 3,
+            key: 'events/3/photos/b.png',
+            position: 1,
+            created_at: new Date(),
+          },
+          {
+            id: 7,
+            event_id: 3,
+            key: 'events/3/photos/a.jpg',
+            position: 0,
+            created_at: new Date(),
+          },
+        ],
       }),
     );
 
@@ -175,23 +200,44 @@ describe('EventService', () => {
 
     it('aplica as regras sobre o valor atual (travado) e devolve a view', async () => {
       const current = makeEvent({ capacity: 10, max_tickets_per_cpf: 2 });
-      eventRepository.updateWithTickets.mockImplementation(async (_id, _changes, check) => {
-        expect(check(current)).toBeNull();
-        expect(check(makeEvent({ max_tickets_per_cpf: 5 }))).toBe('limit_decrease');
-        return { outcome: 'updated', event: makeEvent({ max_tickets_per_cpf: 4, cover_key: 'events/1/cover/a.png' }) };
+      eventRepository.updateWithTickets.mockImplementation(
+        async (_id, _changes, check) => {
+          expect(check(current)).toBeNull();
+          expect(check(makeEvent({ max_tickets_per_cpf: 5 }))).toBe(
+            'limit_decrease',
+          );
+          return {
+            outcome: 'updated',
+            event: makeEvent({
+              max_tickets_per_cpf: 4,
+              cover_key: 'events/1/cover/a.png',
+            }),
+          };
+        },
+      );
+
+      const view = await service.updateEvent(1, owner, {
+        max_tickets_per_cpf: 4,
       });
 
-      const view = await service.updateEvent(1, owner, { max_tickets_per_cpf: 4 });
-
-      expect(eventRepository.updateWithTickets).toHaveBeenCalledWith(1, { max_tickets_per_cpf: 4 }, expect.any(Function));
+      expect(eventRepository.updateWithTickets).toHaveBeenCalledWith(
+        1,
+        { max_tickets_per_cpf: 4 },
+        expect.any(Function),
+      );
       expect(view.max_tickets_per_cpf).toBe(4);
       expect(view.cover_url).toBe(`${PUBLIC_BASE}/events/1/cover/a.png`);
       expect(view).not.toHaveProperty('cover_key');
     });
 
     it('forbidden vira 403', async () => {
-      eventRepository.updateWithTickets.mockResolvedValue({ outcome: 'rejected', reason: 'forbidden' });
-      await expect(service.updateEvent(1, owner, { name: 'x' })).rejects.toBeInstanceOf(ForbiddenException);
+      eventRepository.updateWithTickets.mockResolvedValue({
+        outcome: 'rejected',
+        reason: 'forbidden',
+      });
+      await expect(
+        service.updateEvent(1, owner, { name: 'x' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it.each([
@@ -200,7 +246,10 @@ describe('EventService', () => {
       ['limit_decrease', /por CPF não pode diminuir/],
       ['limit_above_capacity', /maior que a capacidade/],
     ] as const)('%s vira 409', async (reason, message) => {
-      eventRepository.updateWithTickets.mockResolvedValue({ outcome: 'rejected', reason });
+      eventRepository.updateWithTickets.mockResolvedValue({
+        outcome: 'rejected',
+        reason,
+      });
       const promise = service.updateEvent(1, owner, { name: 'x' });
       await expect(promise).rejects.toBeInstanceOf(ConflictException);
       await expect(promise).rejects.toThrow(message);

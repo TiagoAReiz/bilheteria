@@ -1,7 +1,10 @@
 import { act, render, screen } from "@testing-library/react";
 import { nestError } from "@test/helpers";
 import { PaymentReturnView } from "../components/payment-return-view";
-import { PAYMENT_POLL_INTERVAL_MS, PAYMENT_POLL_MAX_ATTEMPTS } from "../hooks/usePaymentStatus";
+import {
+  PAYMENT_POLL_INTERVAL_MS,
+  PAYMENT_POLL_MAX_ATTEMPTS,
+} from "../hooks/usePaymentStatus";
 import { paymentService } from "../services/payment.service";
 import type { PaymentResponse } from "../types/payment.dto";
 
@@ -17,14 +20,17 @@ jest.mock("../services/payment.service", () => ({
 const getPayment = jest.mocked(paymentService.getPayment);
 const NOW = new Date("2099-01-01T12:00:00.000Z");
 
-const makePayment = (overrides: Partial<PaymentResponse> = {}): PaymentResponse => ({
+const makePayment = (
+  overrides: Partial<PaymentResponse> = {},
+): PaymentResponse => ({
   id: PAYMENT_ID,
   ticket_id: 42,
   status: "pending",
   amount_cents: 8990,
   currency: "BRL",
   expires_at: new Date(NOW.getTime() + 3 * 60_000).toISOString(),
-  checkout_url: "https://www.mercadopago.com.br/checkout/v1/redirect?order_id=ORD1",
+  checkout_url:
+    "https://www.mercadopago.com.br/checkout/v1/redirect?order_id=ORD1",
   created_at: NOW.toISOString(),
   updated_at: NOW.toISOString(),
   ...overrides,
@@ -51,15 +57,21 @@ describe("<PaymentReturnView />", () => {
     await flush();
 
     expect(getPayment).toHaveBeenCalledWith(PAYMENT_ID);
-    expect(screen.getByRole("status")).toHaveTextContent("Aguardando a confirmação do pagamento");
-    expect(screen.getByText(/pela página de “pagamento aprovado”/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Aguardando a confirmação do pagamento",
+    );
+    expect(
+      screen.getByText(/pela página de “pagamento aprovado”/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/registrado pela bilheteria/)).toBeInTheDocument();
     expect(screen.getByText(/R\$\s89,90/)).toBeInTheDocument();
     expect(screen.getByText("Consultando o status...")).toBeInTheDocument();
   });
 
   it("enquanto pendente, consulta de novo a cada 3 s até o webhook confirmar", async () => {
-    getPayment.mockResolvedValueOnce(makePayment()).mockResolvedValueOnce(makePayment({ status: "approved" }));
+    getPayment
+      .mockResolvedValueOnce(makePayment())
+      .mockResolvedValueOnce(makePayment({ status: "approved" }));
     render(<PaymentReturnView variant="pending" />);
     await flush();
     expect(getPayment).toHaveBeenCalledTimes(1);
@@ -69,8 +81,12 @@ describe("<PaymentReturnView />", () => {
     });
 
     expect(getPayment).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("status")).toHaveTextContent("Pagamento confirmado!");
-    expect(screen.queryByText("Consultando o status...")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Pagamento confirmado!",
+    );
+    expect(
+      screen.queryByText("Consultando o status..."),
+    ).not.toBeInTheDocument();
 
     // status final: para de consultar
     await act(async () => {
@@ -80,12 +96,18 @@ describe("<PaymentReturnView />", () => {
   });
 
   it("a URL de falha não basta: se a API diz aprovado, mostra aprovado", async () => {
-    getPayment.mockResolvedValue(makePayment({ status: "approved", checkout_url: null }));
+    getPayment.mockResolvedValue(
+      makePayment({ status: "approved", checkout_url: null }),
+    );
     render(<PaymentReturnView variant="failure" />);
     await flush();
 
-    expect(screen.getByRole("status")).toHaveTextContent("Pagamento confirmado!");
-    expect(screen.queryByRole("link", { name: /voltar ao pagamento/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Pagamento confirmado!",
+    );
+    expect(
+      screen.queryByRole("link", { name: /voltar ao pagamento/i }),
+    ).not.toBeInTheDocument();
   });
 
   it.each([
@@ -106,7 +128,9 @@ describe("<PaymentReturnView />", () => {
   });
 
   it("estornado explica que o valor foi devolvido", async () => {
-    getPayment.mockResolvedValue(makePayment({ status: "refunded", checkout_url: null }));
+    getPayment.mockResolvedValue(
+      makePayment({ status: "refunded", checkout_url: null }),
+    );
     render(<PaymentReturnView variant="success" />);
     await flush();
     expect(screen.getByText(/valor foi devolvido/)).toBeInTheDocument();
@@ -117,7 +141,9 @@ describe("<PaymentReturnView />", () => {
     render(<PaymentReturnView variant="pending" />);
     await flush();
 
-    expect(screen.getByRole("link", { name: /voltar ao pagamento/i })).toHaveAttribute(
+    expect(
+      screen.getByRole("link", { name: /voltar ao pagamento/i }),
+    ).toHaveAttribute(
       "href",
       "https://www.mercadopago.com.br/checkout/v1/redirect?order_id=ORD1",
     );
@@ -143,7 +169,9 @@ describe("<PaymentReturnView />", () => {
   });
 
   it("aceita o external_reference que o Mercado Pago devolve na URL", async () => {
-    search = new URLSearchParams(`external_reference=${PAYMENT_ID}&status=approved`);
+    search = new URLSearchParams(
+      `external_reference=${PAYMENT_ID}&status=approved`,
+    );
     getPayment.mockResolvedValue(makePayment({ status: "approved" }));
     render(<PaymentReturnView variant="success" />);
     await flush();
@@ -160,10 +188,14 @@ describe("<PaymentReturnView />", () => {
   });
 
   it("404 (pagamento de outra pessoa ou inexistente)", async () => {
-    getPayment.mockRejectedValue(nestError(404, "Pagamento não encontrado", "Not Found"));
+    getPayment.mockRejectedValue(
+      nestError(404, "Pagamento não encontrado", "Not Found"),
+    );
     render(<PaymentReturnView variant="success" />);
     await flush();
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Pagamento não encontrado");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Pagamento não encontrado",
+    );
   });
 });

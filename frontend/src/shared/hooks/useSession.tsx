@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { sessionService } from "@/shared/services/session.service";
 import type { User } from "@/shared/types/user";
 
@@ -45,13 +53,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const value = useMemo(() => ({ user, status, refresh, signOut }), [user, status, refresh, signOut]);
+  const value = useMemo(
+    () => ({ user, status, refresh, signOut }),
+    [user, status, refresh, signOut],
+  );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
 }
 
 export function useSession(): SessionContextValue {
   const ctx = useContext(SessionContext);
-  if (!ctx) throw new Error("useSession precisa estar dentro de <SessionProvider>");
+  if (!ctx)
+    throw new Error("useSession precisa estar dentro de <SessionProvider>");
   return ctx;
 }

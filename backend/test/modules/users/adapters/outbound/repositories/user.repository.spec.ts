@@ -33,7 +33,10 @@ describe('UserRepository', () => {
 
   describe('getCpfById', () => {
     it('retorna hash e mascarado selecionando só esses campos', async () => {
-      prisma.user.findUnique.mockResolvedValue({ cpfHash: 'abc', cpfMasked: '***.982.247-**' });
+      prisma.user.findUnique.mockResolvedValue({
+        cpfHash: 'abc',
+        cpfMasked: '***.982.247-**',
+      });
 
       await expect(repository.getCpfById('user-1')).resolves.toEqual({
         cpfHash: 'abc',
@@ -46,8 +49,14 @@ describe('UserRepository', () => {
     });
 
     it('retorna nulos quando o usuário existe sem CPF', async () => {
-      prisma.user.findUnique.mockResolvedValue({ cpfHash: null, cpfMasked: null });
-      await expect(repository.getCpfById('user-1')).resolves.toEqual({ cpfHash: null, cpfMasked: null });
+      prisma.user.findUnique.mockResolvedValue({
+        cpfHash: null,
+        cpfMasked: null,
+      });
+      await expect(repository.getCpfById('user-1')).resolves.toEqual({
+        cpfHash: null,
+        cpfMasked: null,
+      });
     });
 
     it('lança NotFound quando o usuário não existe', async () => {
@@ -81,7 +90,11 @@ describe('UserRepository', () => {
     it('mapeia P2002 (unique) para ConflictException', async () => {
       prisma.user.updateMany.mockRejectedValue(knownError('P2002'));
 
-      const promise = repository.setCpfIfEmpty('user-1', 'hash', '***.982.247-**');
+      const promise = repository.setCpfIfEmpty(
+        'user-1',
+        'hash',
+        '***.982.247-**',
+      );
       await expect(promise).rejects.toBeInstanceOf(ConflictException);
       await expect(promise).rejects.toThrow(
         'Este CPF já está vinculado a outra conta',
@@ -91,25 +104,25 @@ describe('UserRepository', () => {
     it('repassa outros erros conhecidos do Prisma', async () => {
       const error = knownError('P2025');
       prisma.user.updateMany.mockRejectedValue(error);
-      await expect(repository.setCpfIfEmpty('user-1', 'hash', '***.982.247-**')).rejects.toBe(
-        error,
-      );
+      await expect(
+        repository.setCpfIfEmpty('user-1', 'hash', '***.982.247-**'),
+      ).rejects.toBe(error);
     });
 
     it('repassa erros genéricos', async () => {
       const error = new Error('conexão perdida');
       prisma.user.updateMany.mockRejectedValue(error);
-      await expect(repository.setCpfIfEmpty('user-1', 'hash', '***.982.247-**')).rejects.toBe(
-        error,
-      );
+      await expect(
+        repository.setCpfIfEmpty('user-1', 'hash', '***.982.247-**'),
+      ).rejects.toBe(error);
     });
 
     it('não confunde um objeto com code P2002 que não é PrismaClientKnownRequestError', async () => {
       const error = Object.assign(new Error('fake'), { code: 'P2002' });
       prisma.user.updateMany.mockRejectedValue(error);
-      await expect(repository.setCpfIfEmpty('user-1', 'hash', '***.982.247-**')).rejects.toBe(
-        error,
-      );
+      await expect(
+        repository.setCpfIfEmpty('user-1', 'hash', '***.982.247-**'),
+      ).rejects.toBe(error);
     });
   });
 
@@ -136,9 +149,13 @@ describe('UserRepository', () => {
 
   describe('replaceAvatarKey', () => {
     it('trava a linha, troca a chave e devolve a anterior e a foto do provedor', async () => {
-      tx.$queryRaw.mockResolvedValue([{ avatar_key: 'old', image: 'https://google/foto.jpg' }]);
+      tx.$queryRaw.mockResolvedValue([
+        { avatar_key: 'old', image: 'https://google/foto.jpg' },
+      ]);
 
-      await expect(repository.replaceAvatarKey('user-1', 'new')).resolves.toEqual({
+      await expect(
+        repository.replaceAvatarKey('user-1', 'new'),
+      ).resolves.toEqual({
         previousKey: 'old',
         image: 'https://google/foto.jpg',
       });
@@ -146,12 +163,17 @@ describe('UserRepository', () => {
       expect(sql.join('?').replace(/\s+/g, ' ').trim()).toBe(
         'SELECT avatar_key, image FROM users WHERE id = ? FOR UPDATE',
       );
-      expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'user-1' }, data: { avatarKey: 'new' } });
+      expect(tx.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { avatarKey: 'new' },
+      });
     });
 
     it('usuário inexistente: NotFound', async () => {
       tx.$queryRaw.mockResolvedValue([]);
-      await expect(repository.replaceAvatarKey('x', null)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        repository.replaceAvatarKey('x', null),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(tx.user.update).not.toHaveBeenCalled();
     });
   });

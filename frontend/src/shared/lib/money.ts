@@ -1,6 +1,9 @@
 /** Dinheiro trafega em centavos inteiros (como na API); reais só na tela. */
 
-const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const BRL = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
 
 /** 5000 -> "R$ 50,00" */
 export function formatBRL(cents: number): string {

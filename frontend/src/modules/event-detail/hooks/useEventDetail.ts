@@ -5,7 +5,10 @@ import { eventDetailService } from "../services/event-detail.service";
 
 export function useEventDetail(eventId: number) {
   const event = useAsync(() => eventDetailService.getEvent(eventId), eventId);
-  const status = useAsync(() => eventDetailService.getTicketStatus(eventId), eventId);
+  const status = useAsync(
+    () => eventDetailService.getTicketStatus(eventId),
+    eventId,
+  );
 
   return {
     event: event.data,

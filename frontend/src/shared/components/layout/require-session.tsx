@@ -16,7 +16,8 @@ export function RequireSession({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (status === "unauthenticated") router.replace(buildLoginUrl(pathname || "/"));
+    if (status === "unauthenticated")
+      router.replace(buildLoginUrl(pathname || "/"));
   }, [status, router, pathname]);
 
   if (status !== "authenticated") {

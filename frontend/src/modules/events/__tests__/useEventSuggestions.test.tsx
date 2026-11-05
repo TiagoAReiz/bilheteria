@@ -4,10 +4,17 @@ import { useEventSuggestions } from "../hooks/useEventSuggestions";
 import { eventSearchService } from "../services/event-search.service";
 import { SUGGEST_DEBOUNCE_MS } from "../types/event-search.dto";
 
-jest.mock("../services/event-search.service", () => ({ eventSearchService: { suggest: jest.fn() } }));
+jest.mock("../services/event-search.service", () => ({
+  eventSearchService: { suggest: jest.fn() },
+}));
 const suggest = jest.mocked(eventSearchService.suggest);
 
-const suggestion = (id: number, name: string) => ({ id, name, location: "Arena", starts_at: "2099-01-01T20:00:00.000Z" });
+const suggestion = (id: number, name: string) => ({
+  id,
+  name,
+  location: "Arena",
+  starts_at: "2099-01-01T20:00:00.000Z",
+});
 
 describe("useEventSuggestions", () => {
   beforeEach(() => {
@@ -21,7 +28,9 @@ describe("useEventSuggestions", () => {
 
   it("espera a digitação parar antes de buscar", async () => {
     suggest.mockResolvedValue([suggestion(1, "Rock in Rio")]);
-    const { result, rerender } = renderHook(({ q }) => useEventSuggestions(q), { initialProps: { q: "" } });
+    const { result, rerender } = renderHook(({ q }) => useEventSuggestions(q), {
+      initialProps: { q: "" },
+    });
 
     rerender({ q: "ro" });
     rerender({ q: "roc" });
@@ -52,18 +61,26 @@ describe("useEventSuggestions", () => {
       return new Promise(() => {});
     });
     suggest.mockResolvedValueOnce([suggestion(2, "Rock Nacional")]);
-    const { result, rerender } = renderHook(({ q }) => useEventSuggestions(q), { initialProps: { q: "ro" } });
+    const { result, rerender } = renderHook(({ q }) => useEventSuggestions(q), {
+      initialProps: { q: "ro" },
+    });
     act(() => jest.advanceTimersByTime(SUGGEST_DEBOUNCE_MS));
 
     rerender({ q: "rock" });
     act(() => jest.advanceTimersByTime(SUGGEST_DEBOUNCE_MS));
 
     expect(firstSignal?.aborted).toBe(true);
-    await waitFor(() => expect(result.current.suggestions.map((s) => s.name)).toEqual(["Rock Nacional"]));
+    await waitFor(() =>
+      expect(result.current.suggestions.map((s) => s.name)).toEqual([
+        "Rock Nacional",
+      ]),
+    );
   });
 
   it("falha da busca só esconde as sugestões", async () => {
-    suggest.mockRejectedValue(nestError(503, "A busca está temporariamente indisponível."));
+    suggest.mockRejectedValue(
+      nestError(503, "A busca está temporariamente indisponível."),
+    );
     const { result } = renderHook(() => useEventSuggestions("rock"));
     act(() => jest.advanceTimersByTime(SUGGEST_DEBOUNCE_MS));
 

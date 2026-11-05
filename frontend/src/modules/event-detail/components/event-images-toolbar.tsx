@@ -21,13 +21,18 @@ export function EventImagesToolbar({ images }: { images: EventImages }) {
   const galleryFull = images.photos.length >= MAX_EVENT_PHOTOS;
 
   return (
-    <section className="space-y-2 rounded-lg border border-dashed p-3" aria-label="Imagens do evento">
+    <section
+      className="space-y-2 rounded-lg border border-dashed p-3"
+      aria-label="Imagens do evento"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <ImageFileButton
           label="Escolher imagem da capa"
           loading={images.uploadingCover}
           disabled={images.busy}
-          onFile={(file) => void notify(images.uploadCover(file), "Capa atualizada.")}
+          onFile={(file) =>
+            void notify(images.uploadCover(file), "Capa atualizada.")
+          }
         >
           <ImageIcon aria-hidden />
           {images.coverUrl ? "Trocar capa" : "Adicionar capa"}
@@ -47,14 +52,19 @@ export function EventImagesToolbar({ images }: { images: EventImages }) {
           label="Escolher foto para a galeria"
           loading={images.uploadingPhoto}
           disabled={images.busy || galleryFull}
-          onFile={(file) => void notify(images.addPhoto(file), "Foto adicionada à galeria.")}
+          onFile={(file) =>
+            void notify(images.addPhoto(file), "Foto adicionada à galeria.")
+          }
         >
           <ImagePlusIcon aria-hidden />
           Adicionar foto ({images.photos.length}/{MAX_EVENT_PHOTOS})
         </ImageFileButton>
       </div>
       <p className="text-xs text-muted-foreground">
-        JPEG, PNG ou WebP de até 5 MB. {galleryFull ? "A galeria está cheia: remova uma foto para adicionar outra." : null}
+        JPEG, PNG ou WebP de até 5 MB.{" "}
+        {galleryFull
+          ? "A galeria está cheia: remova uma foto para adicionar outra."
+          : null}
       </p>
     </section>
   );

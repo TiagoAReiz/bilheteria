@@ -60,12 +60,22 @@ export interface EventSearchFilters {
   onlyAvailable: boolean;
 }
 
-export const EMPTY_FILTERS: EventSearchFilters = { q: "", location: "", from: "", to: "", onlyAvailable: false };
+export const EMPTY_FILTERS: EventSearchFilters = {
+  q: "",
+  location: "",
+  from: "",
+  to: "",
+  onlyAvailable: false,
+};
 
 /** Há algum filtro preenchido? Sem nenhum, a home mostra a lista padrão (GET /events). */
 export function hasActiveFilters(filters: EventSearchFilters): boolean {
   return (
-    filters.q.trim() !== "" || filters.location !== "" || filters.from !== "" || filters.to !== "" || filters.onlyAvailable
+    filters.q.trim() !== "" ||
+    filters.location !== "" ||
+    filters.from !== "" ||
+    filters.to !== "" ||
+    filters.onlyAvailable
   );
 }
 
@@ -73,13 +83,18 @@ export function hasActiveFilters(filters: EventSearchFilters): boolean {
  * Converte o formulário na query da API. As datas do <input type="date"> são dias no fuso do
  * navegador: "de" vale desde 00:00 e "até" vale até 23:59:59.999 daquele dia.
  */
-export function toSearchParams(filters: EventSearchFilters, page = 1): SearchEventsParams {
+export function toSearchParams(
+  filters: EventSearchFilters,
+  page = 1,
+): SearchEventsParams {
   const params: SearchEventsParams = { page, size: SEARCH_PAGE_SIZE };
   const q = filters.q.trim();
   if (q) params.q = q;
   if (filters.location) params.location = filters.location;
-  if (filters.from) params.from = new Date(`${filters.from}T00:00:00`).toISOString();
-  if (filters.to) params.to = new Date(`${filters.to}T23:59:59.999`).toISOString();
+  if (filters.from)
+    params.from = new Date(`${filters.from}T00:00:00`).toISOString();
+  if (filters.to)
+    params.to = new Date(`${filters.to}T23:59:59.999`).toISOString();
   if (filters.onlyAvailable) params.available = true;
   return params;
 }

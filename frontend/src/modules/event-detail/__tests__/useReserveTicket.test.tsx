@@ -1,9 +1,14 @@
 import { act, renderHook } from "@testing-library/react";
 import { nestError } from "@test/helpers";
-import { getReservationExpiry, useReserveTicket } from "../hooks/useReserveTicket";
+import {
+  getReservationExpiry,
+  useReserveTicket,
+} from "../hooks/useReserveTicket";
 import { eventDetailService } from "../services/event-detail.service";
 
-jest.mock("../services/event-detail.service", () => ({ eventDetailService: { reserveTicket: jest.fn() } }));
+jest.mock("../services/event-detail.service", () => ({
+  eventDetailService: { reserveTicket: jest.fn() },
+}));
 const reserveTicket = jest.mocked(eventDetailService.reserveTicket);
 
 describe("useReserveTicket", () => {
@@ -25,7 +30,9 @@ describe("useReserveTicket", () => {
 
     expect(reserveTicket).toHaveBeenCalledWith(5);
     expect(result.current.result?.ticket.id).toBe(1);
-    expect(result.current.result?.expiresAt.toISOString()).toBe("2099-01-01T10:05:00.000Z");
+    expect(result.current.result?.expiresAt.toISOString()).toBe(
+      "2099-01-01T10:05:00.000Z",
+    );
     expect(result.current.error).toBeNull();
     expect(result.current.loading).toBe(false);
   });
@@ -51,6 +58,8 @@ describe("useReserveTicket", () => {
 
   it("getReservationExpiry usa agora quando reserved_at é null", () => {
     const now = new Date("2099-01-01T00:00:00.000Z");
-    expect(getReservationExpiry(null, now).toISOString()).toBe("2099-01-01T00:05:00.000Z");
+    expect(getReservationExpiry(null, now).toISOString()).toBe(
+      "2099-01-01T00:05:00.000Z",
+    );
   });
 });

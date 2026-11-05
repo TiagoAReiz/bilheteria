@@ -72,7 +72,13 @@ const createPrismaFake = () => ({
   event: {
     findMany: vi.fn().mockResolvedValue([upcoming]),
     findFirst: vi.fn(
-      async ({ where, include }: { where: { id: number }; include?: { photos?: unknown } }) => {
+      async ({
+        where,
+        include,
+      }: {
+        where: { id: number };
+        include?: { photos?: unknown };
+      }) => {
         if (where.id !== upcoming.id) return null;
         return include?.photos
           ? {
@@ -170,7 +176,11 @@ describe('Bilheteria (e2e, sem banco)', () => {
         cover_url:
           'http://cdn.e2e/bilheteria-images/events/1/cover/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png',
         photos: [
-          { id: 3, url: 'http://cdn.e2e/bilheteria-images/events/1/photos/a.webp', position: 0 },
+          {
+            id: 3,
+            url: 'http://cdn.e2e/bilheteria-images/events/1/photos/a.webp',
+            position: 0,
+          },
         ],
       });
     });
@@ -216,7 +226,11 @@ describe('Bilheteria (e2e, sem banco)', () => {
 
   describe('webhook do Mercado Pago', () => {
     const url = '/webhooks/mercadopago?data.id=ORDTST01&type=order';
-    const body = { action: 'order.processed', type: 'order', data: { id: 'ORDTST01' } };
+    const body = {
+      action: 'order.processed',
+      type: 'order',
+      data: { id: 'ORDTST01' },
+    };
 
     it('sem assinatura: 401 sem tocar no banco', async () => {
       await request(app.getHttpServer()).post(url).send(body).expect(401);
@@ -225,8 +239,15 @@ describe('Bilheteria (e2e, sem banco)', () => {
 
     it('assinatura com segredo errado: 401', async () => {
       const headers = mercadoPagoHeaders('ORDTST01');
-      headers['x-signature'] = headers['x-signature'].replace(/v1=[0-9a-f]+/, `v1=${'0'.repeat(64)}`);
-      await request(app.getHttpServer()).post(url).set(headers).send(body).expect(401);
+      headers['x-signature'] = headers['x-signature'].replace(
+        /v1=[0-9a-f]+/,
+        `v1=${'0'.repeat(64)}`,
+      );
+      await request(app.getHttpServer())
+        .post(url)
+        .set(headers)
+        .send(body)
+        .expect(401);
     });
 
     it('assinatura de outra order (data.id trocado na URL): 401', async () => {

@@ -1,5 +1,10 @@
 import { VALID_CPF } from "@test/helpers";
-import { isValidCpf, maskCpf, maskCpfForDisplay, onlyDigits } from "@/shared/lib/cpf";
+import {
+  isValidCpf,
+  maskCpf,
+  maskCpfForDisplay,
+  onlyDigits,
+} from "@/shared/lib/cpf";
 
 describe("cpf", () => {
   it.each([

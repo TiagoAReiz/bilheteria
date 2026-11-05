@@ -1,11 +1,18 @@
 import { AxiosError, AxiosHeaders, type AxiosResponse } from "axios";
 import type { EventResponse } from "@/shared/types/event";
-import type { EventSearchItem, SearchEventsResponse } from "@/modules/events/types/event-search.dto";
+import type {
+  EventSearchItem,
+  SearchEventsResponse,
+} from "@/modules/events/types/event-search.dto";
 import type { User } from "@/shared/types/user";
 import type { EventDetailResponse } from "@/modules/event-detail/types/event-detail.dto";
 
 /** Cria um erro do axios no formato que o NestJS devolve. */
-export function nestError(status: number, message: string | string[] = "erro", error = "Error"): AxiosError {
+export function nestError(
+  status: number,
+  message: string | string[] = "erro",
+  error = "Error",
+): AxiosError {
   const config = { headers: new AxiosHeaders() };
   const response: AxiosResponse = {
     status,
@@ -17,7 +24,9 @@ export function nestError(status: number, message: string | string[] = "erro", e
   return new AxiosError(String(message), String(status), config, {}, response);
 }
 
-export function makeEvent(overrides: Partial<EventResponse> = {}): EventResponse {
+export function makeEvent(
+  overrides: Partial<EventResponse> = {},
+): EventResponse {
   return {
     id: 1,
     name: "Show de Rock",
@@ -36,11 +45,15 @@ export function makeEvent(overrides: Partial<EventResponse> = {}): EventResponse
   };
 }
 
-export function makeEventDetail(overrides: Partial<EventDetailResponse> = {}): EventDetailResponse {
+export function makeEventDetail(
+  overrides: Partial<EventDetailResponse> = {},
+): EventDetailResponse {
   return { ...makeEvent(), photos: [], ...overrides };
 }
 
-export function makeSearchItem(overrides: Partial<EventSearchItem> = {}): EventSearchItem {
+export function makeSearchItem(
+  overrides: Partial<EventSearchItem> = {},
+): EventSearchItem {
   return {
     id: 1,
     name: "Show de Rock",
@@ -54,9 +67,18 @@ export function makeSearchItem(overrides: Partial<EventSearchItem> = {}): EventS
   };
 }
 
-export function makeSearchResponse(overrides: Partial<SearchEventsResponse> = {}): SearchEventsResponse {
+export function makeSearchResponse(
+  overrides: Partial<SearchEventsResponse> = {},
+): SearchEventsResponse {
   const items = overrides.items ?? [makeSearchItem()];
-  return { items, total: items.length, page: 1, size: 12, facets: { locations: [] }, ...overrides };
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    size: 12,
+    facets: { locations: [] },
+    ...overrides,
+  };
 }
 
 export function makeUser(overrides: Partial<User> = {}): User {
@@ -74,7 +96,10 @@ export function makeUser(overrides: Partial<User> = {}): User {
 }
 
 /** Mock padrão de `useSession` para componentes. */
-export function sessionValue(user: User | null, status?: "loading" | "authenticated" | "unauthenticated") {
+export function sessionValue(
+  user: User | null,
+  status?: "loading" | "authenticated" | "unauthenticated",
+) {
   return {
     user,
     status: status ?? (user ? "authenticated" : "unauthenticated"),

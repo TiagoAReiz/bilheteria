@@ -1,5 +1,5 @@
 export class Status {
-    total: number;
-    available: number;
-    reserved: number;
+  total: number;
+  available: number;
+  reserved: number;
 }

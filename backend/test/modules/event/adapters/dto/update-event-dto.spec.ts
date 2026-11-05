@@ -7,7 +7,9 @@ const NOW = new Date('2026-06-15T12:00:00.000Z');
 
 async function errorsFor(body: Record<string, unknown>) {
   const errors = await validate(plainToInstance(UpdateEventDto, body));
-  return Object.fromEntries(errors.map((e) => [e.property, Object.keys(e.constraints ?? {})]));
+  return Object.fromEntries(
+    errors.map((e) => [e.property, Object.keys(e.constraints ?? {})]),
+  );
 }
 
 describe('UpdateEventDto', () => {
@@ -22,11 +24,15 @@ describe('UpdateEventDto', () => {
 
   it('aceita body vazio e campos parciais', async () => {
     expect(await errorsFor({})).toEqual({});
-    expect(await errorsFor({ name: 'Novo', max_tickets_per_cpf: 5 })).toEqual({});
+    expect(await errorsFor({ name: 'Novo', max_tickets_per_cpf: 5 })).toEqual(
+      {},
+    );
   });
 
   it('"" ou null apagam a descrição', async () => {
-    expect(plainToInstance(UpdateEventDto, { description: '' }).description).toBeNull();
+    expect(
+      plainToInstance(UpdateEventDto, { description: '' }).description,
+    ).toBeNull();
     expect(await errorsFor({ description: null })).toEqual({});
     expect(await errorsFor({ description: 3 })).toHaveProperty('description');
   });

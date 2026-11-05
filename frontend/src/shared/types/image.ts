@@ -1,5 +1,9 @@
 /** Tipos aceitos pela API (o S3 recusa qualquer outro Content-Type no POST pré-assinado). */
-export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
 
 export type ImageContentType = (typeof ALLOWED_IMAGE_TYPES)[number];
 

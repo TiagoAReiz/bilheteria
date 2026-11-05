@@ -1,4 +1,9 @@
-import { EMPTY_FILTERS, hasActiveFilters, SEARCH_PAGE_SIZE, toSearchParams } from "../types/event-search.dto";
+import {
+  EMPTY_FILTERS,
+  hasActiveFilters,
+  SEARCH_PAGE_SIZE,
+  toSearchParams,
+} from "../types/event-search.dto";
 
 describe("event-search.dto", () => {
   describe("hasActiveFilters", () => {
@@ -28,14 +33,26 @@ describe("event-search.dto", () => {
     });
 
     it("converte o período para o dia inteiro no fuso do navegador", () => {
-      const params = toSearchParams({ ...EMPTY_FILTERS, from: "2099-05-10", to: "2099-05-12" });
+      const params = toSearchParams({
+        ...EMPTY_FILTERS,
+        from: "2099-05-10",
+        to: "2099-05-12",
+      });
 
       expect(params.from).toBe(new Date(2099, 4, 10, 0, 0, 0, 0).toISOString());
-      expect(params.to).toBe(new Date(2099, 4, 12, 23, 59, 59, 999).toISOString());
+      expect(params.to).toBe(
+        new Date(2099, 4, 12, 23, 59, 59, 999).toISOString(),
+      );
     });
 
     it("envia local e disponibilidade", () => {
-      expect(toSearchParams({ ...EMPTY_FILTERS, location: "São Paulo", onlyAvailable: true })).toEqual({
+      expect(
+        toSearchParams({
+          ...EMPTY_FILTERS,
+          location: "São Paulo",
+          onlyAvailable: true,
+        }),
+      ).toEqual({
         location: "São Paulo",
         available: true,
         page: 1,

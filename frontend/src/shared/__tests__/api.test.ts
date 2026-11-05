@@ -18,7 +18,9 @@ describe("instância axios", () => {
   it("em 401 redireciona para /login com a rota atual", async () => {
     window.history.pushState({}, "", "/profile?x=1");
     await expect(handleUnauthorized(nestError(401))).rejects.toBeDefined();
-    expect(hardRedirect).toHaveBeenCalledWith("/login?redirect=%2Fprofile%3Fx%3D1");
+    expect(hardRedirect).toHaveBeenCalledWith(
+      "/login?redirect=%2Fprofile%3Fx%3D1",
+    );
   });
 
   it("não redireciona se já estiver no /login", async () => {

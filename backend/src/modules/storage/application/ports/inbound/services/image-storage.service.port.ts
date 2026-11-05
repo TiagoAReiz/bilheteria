@@ -1,4 +1,4 @@
-import {ImageKind, PresignedUpload} from "../../../../core/entities/image.js";
+import { ImageKind, PresignedUpload } from '../../../../core/entities/image.js';
 
 export const IMAGE_STORAGE_SERVICE = Symbol('IMAGE_STORAGE_SERVICE');
 
@@ -11,12 +11,16 @@ export const IMAGE_STORAGE_SERVICE = Symbol('IMAGE_STORAGE_SERVICE');
  * Quem pode enviar para qual prefixo é decidido por quem chama (event, users).
  */
 export interface ImageStorageServicePort {
-    /** 400 se o tipo não for jpeg/png/webp; 503 se o bucket estiver fora. */
-    createUpload(kind: ImageKind, prefix: string, contentType: string): Promise<PresignedUpload>;
-    /** 400 se a chave não for deste prefixo, não existir ou não for uma imagem válida (o objeto inválido é apagado). */
-    confirmUpload(kind: ImageKind, prefix: string, key: string): Promise<void>;
-    publicUrl(key: string): string;
-    publicUrlOrNull(key: string | null | undefined): string | null;
-    /** Apaga sem propagar erro (melhor esforço: falha vira log e métrica). */
-    deleteQuietly(kind: ImageKind, key: string | null | undefined): Promise<void>;
+  /** 400 se o tipo não for jpeg/png/webp; 503 se o bucket estiver fora. */
+  createUpload(
+    kind: ImageKind,
+    prefix: string,
+    contentType: string,
+  ): Promise<PresignedUpload>;
+  /** 400 se a chave não for deste prefixo, não existir ou não for uma imagem válida (o objeto inválido é apagado). */
+  confirmUpload(kind: ImageKind, prefix: string, key: string): Promise<void>;
+  publicUrl(key: string): string;
+  publicUrlOrNull(key: string | null | undefined): string | null;
+  /** Apaga sem propagar erro (melhor esforço: falha vira log e métrica). */
+  deleteQuietly(kind: ImageKind, key: string | null | undefined): Promise<void>;
 }

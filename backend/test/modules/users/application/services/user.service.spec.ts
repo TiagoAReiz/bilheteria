@@ -12,7 +12,10 @@ import {
 } from '../../../../../src/modules/users/application/ports/outbound/crypto/cpf-hasher.port.js';
 import { Cpf } from '../../../../../src/modules/users/core/entities/cpf.js';
 import { IMAGE_STORAGE_SERVICE } from '../../../../../src/modules/storage/application/ports/inbound/services/image-storage.service.port.js';
-import { mockImageStorage, PUBLIC_BASE } from '../../../../utils/image-storage.js';
+import {
+  mockImageStorage,
+  PUBLIC_BASE,
+} from '../../../../utils/image-storage.js';
 
 describe('UserService', () => {
   let service: UserService;
@@ -90,20 +93,29 @@ describe('UserService', () => {
 
   describe('hasCpf', () => {
     it('retorna true quando existe hash', async () => {
-      userRepository.getCpfById.mockResolvedValue({ cpfHash: 'abc', cpfMasked: '***.982.247-**' });
+      userRepository.getCpfById.mockResolvedValue({
+        cpfHash: 'abc',
+        cpfMasked: '***.982.247-**',
+      });
       await expect(service.hasCpf('user-1')).resolves.toBe(true);
       expect(userRepository.getCpfById).toHaveBeenCalledWith('user-1');
     });
 
     it('retorna false quando o hash é null', async () => {
-      userRepository.getCpfById.mockResolvedValue({ cpfHash: null, cpfMasked: null });
+      userRepository.getCpfById.mockResolvedValue({
+        cpfHash: null,
+        cpfMasked: null,
+      });
       await expect(service.hasCpf('user-1')).resolves.toBe(false);
     });
   });
 
   describe('getCpfStatus', () => {
     it('devolve o CPF mascarado quando cadastrado', async () => {
-      userRepository.getCpfById.mockResolvedValue({ cpfHash: 'abc', cpfMasked: '***.982.247-**' });
+      userRepository.getCpfById.mockResolvedValue({
+        cpfHash: 'abc',
+        cpfMasked: '***.982.247-**',
+      });
       await expect(service.getCpfStatus('user-1')).resolves.toEqual({
         hasCpf: true,
         cpfMasked: '***.982.247-**',
@@ -111,13 +123,25 @@ describe('UserService', () => {
     });
 
     it('conta antiga (só hash) tem CPF mas sem mascarado', async () => {
-      userRepository.getCpfById.mockResolvedValue({ cpfHash: 'abc', cpfMasked: null });
-      await expect(service.getCpfStatus('user-1')).resolves.toEqual({ hasCpf: true, cpfMasked: null });
+      userRepository.getCpfById.mockResolvedValue({
+        cpfHash: 'abc',
+        cpfMasked: null,
+      });
+      await expect(service.getCpfStatus('user-1')).resolves.toEqual({
+        hasCpf: true,
+        cpfMasked: null,
+      });
     });
 
     it('sem CPF', async () => {
-      userRepository.getCpfById.mockResolvedValue({ cpfHash: null, cpfMasked: null });
-      await expect(service.getCpfStatus('user-1')).resolves.toEqual({ hasCpf: false, cpfMasked: null });
+      userRepository.getCpfById.mockResolvedValue({
+        cpfHash: null,
+        cpfMasked: null,
+      });
+      await expect(service.getCpfStatus('user-1')).resolves.toEqual({
+        hasCpf: false,
+        cpfMasked: null,
+      });
     });
   });
 
@@ -135,52 +159,93 @@ describe('UserService', () => {
 
     it('createAvatarUpload usa o prefixo do próprio usuário', async () => {
       await service.createAvatarUpload('user-1', 'image/png');
-      expect(images.createUpload).toHaveBeenCalledWith('user_avatar', 'users/user-1/avatar', 'image/png');
+      expect(images.createUpload).toHaveBeenCalledWith(
+        'user_avatar',
+        'users/user-1/avatar',
+        'image/png',
+      );
     });
 
     it('confirmAvatar valida no prefixo do usuário, grava e apaga o avatar anterior', async () => {
-      userRepository.replaceAvatarKey.mockResolvedValue({ previousKey: OLD, image: 'https://google/foto.jpg' });
+      userRepository.replaceAvatarKey.mockResolvedValue({
+        previousKey: OLD,
+        image: 'https://google/foto.jpg',
+      });
 
       await expect(service.confirmAvatar('user-1', KEY)).resolves.toEqual({
         avatar_url: `${PUBLIC_BASE}/${KEY}`,
       });
-      expect(images.confirmUpload).toHaveBeenCalledWith('user_avatar', 'users/user-1/avatar', KEY);
-      expect(userRepository.replaceAvatarKey).toHaveBeenCalledWith('user-1', KEY);
+      expect(images.confirmUpload).toHaveBeenCalledWith(
+        'user_avatar',
+        'users/user-1/avatar',
+        KEY,
+      );
+      expect(userRepository.replaceAvatarKey).toHaveBeenCalledWith(
+        'user-1',
+        KEY,
+      );
       expect(images.deleteQuietly).toHaveBeenCalledWith('user_avatar', OLD);
     });
 
     it('primeiro avatar (só a foto do Google antes): nada para apagar', async () => {
-      userRepository.replaceAvatarKey.mockResolvedValue({ previousKey: null, image: 'https://google/foto.jpg' });
+      userRepository.replaceAvatarKey.mockResolvedValue({
+        previousKey: null,
+        image: 'https://google/foto.jpg',
+      });
       await service.confirmAvatar('user-1', KEY);
       // a foto do Google não é nossa: nunca vai para o deleteQuietly (null é ignorado por ele)
-      expect(images.deleteQuietly).not.toHaveBeenCalledWith('user_avatar', expect.any(String));
+      expect(images.deleteQuietly).not.toHaveBeenCalledWith(
+        'user_avatar',
+        expect.any(String),
+      );
     });
 
     it('confirmação repetida da mesma chave não apaga o próprio avatar', async () => {
-      userRepository.replaceAvatarKey.mockResolvedValue({ previousKey: KEY, image: null });
+      userRepository.replaceAvatarKey.mockResolvedValue({
+        previousKey: KEY,
+        image: null,
+      });
       await service.confirmAvatar('user-1', KEY);
       expect(images.deleteQuietly).not.toHaveBeenCalled();
     });
 
     it('upload inválido (ex.: chave de outro usuário) não grava nada', async () => {
-      images.confirmUpload.mockRejectedValue(new BadRequestException('Chave de upload inválida'));
+      images.confirmUpload.mockRejectedValue(
+        new BadRequestException('Chave de upload inválida'),
+      );
       await expect(
-        service.confirmAvatar('user-1', 'users/user-2/avatar/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png'),
+        service.confirmAvatar(
+          'user-1',
+          'users/user-2/avatar/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png',
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(userRepository.replaceAvatarKey).not.toHaveBeenCalled();
     });
 
     it('removeAvatar volta para a foto do provedor e apaga o objeto', async () => {
-      userRepository.replaceAvatarKey.mockResolvedValue({ previousKey: OLD, image: 'https://google/foto.jpg' });
+      userRepository.replaceAvatarKey.mockResolvedValue({
+        previousKey: OLD,
+        image: 'https://google/foto.jpg',
+      });
 
-      await expect(service.removeAvatar('user-1')).resolves.toEqual({ avatar_url: 'https://google/foto.jpg' });
-      expect(userRepository.replaceAvatarKey).toHaveBeenCalledWith('user-1', null);
+      await expect(service.removeAvatar('user-1')).resolves.toEqual({
+        avatar_url: 'https://google/foto.jpg',
+      });
+      expect(userRepository.replaceAvatarKey).toHaveBeenCalledWith(
+        'user-1',
+        null,
+      );
       expect(images.deleteQuietly).toHaveBeenCalledWith('user_avatar', OLD);
     });
 
     it('removeAvatar sem foto do provedor: avatar_url null (iniciais no front)', async () => {
-      userRepository.replaceAvatarKey.mockResolvedValue({ previousKey: null, image: null });
-      await expect(service.removeAvatar('user-1')).resolves.toEqual({ avatar_url: null });
+      userRepository.replaceAvatarKey.mockResolvedValue({
+        previousKey: null,
+        image: null,
+      });
+      await expect(service.removeAvatar('user-1')).resolves.toEqual({
+        avatar_url: null,
+      });
     });
   });
 });

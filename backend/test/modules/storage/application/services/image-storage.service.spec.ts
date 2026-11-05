@@ -1,4 +1,8 @@
-import { BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { MockPort } from '../../../../utils/mocks.js';
 import { ImageStorageService } from '../../../../../src/modules/storage/application/services/image-storage.service.js';
@@ -11,12 +15,17 @@ import {
   STORAGE_METRICS,
   type StorageMetricsPort,
 } from '../../../../../src/modules/storage/application/ports/outbound/metrics/storage-metrics.port.js';
-import { MAX_IMAGE_BYTES, UPLOAD_URL_TTL_SECONDS } from '../../../../../src/modules/storage/core/entities/image.js';
+import {
+  MAX_IMAGE_BYTES,
+  UPLOAD_URL_TTL_SECONDS,
+} from '../../../../../src/modules/storage/core/entities/image.js';
 
 const NOW = new Date('2026-06-15T12:00:00.000Z');
 const PREFIX = 'events/3/cover';
 const KEY = `${PREFIX}/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png`;
-const PNG_HEAD = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
+const PNG_HEAD = Uint8Array.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d,
+]);
 
 describe('ImageStorageService', () => {
   let service: ImageStorageService;
@@ -27,11 +36,18 @@ describe('ImageStorageService', () => {
   beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
-    warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    warn = vi
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     storage = {
-      createPresignedPost: vi.fn().mockResolvedValue({ url: 'http://s3/bucket', fields: { key: 'k', Policy: 'p' } }),
-      headObject: vi.fn().mockResolvedValue({ size: 1024, contentType: 'image/png' }),
+      createPresignedPost: vi.fn().mockResolvedValue({
+        url: 'http://s3/bucket',
+        fields: { key: 'k', Policy: 'p' },
+      }),
+      headObject: vi
+        .fn()
+        .mockResolvedValue({ size: 1024, contentType: 'image/png' }),
       readPrefix: vi.fn().mockResolvedValue(PNG_HEAD),
       deleteObject: vi.fn().mockResolvedValue(undefined),
       publicUrl: vi.fn((key: string) => `https://cdn.test/${key}`),
@@ -59,7 +75,11 @@ describe('ImageStorageService', () => {
 
   describe('createUpload', () => {
     it('gera a chave no servidor e pede um POST que o S3 limita a 5 MB e ao tipo', async () => {
-      const upload = await service.createUpload('event_cover', PREFIX, 'image/png');
+      const upload = await service.createUpload(
+        'event_cover',
+        PREFIX,
+        'image/png',
+      );
 
       expect(upload.key).toMatch(/^events\/3\/cover\/[0-9a-f-]{36}\.png$/);
       expect(storage.createPresignedPost).toHaveBeenCalledWith({
@@ -84,23 +104,32 @@ describe('ImageStorageService', () => {
       expect(a.key).not.toBe(b.key);
     });
 
-    it.each(['image/gif', 'image/svg+xml', 'text/html', ''])('recusa %j sem assinar nada', async (type) => {
-      await expect(service.createUpload('event_cover', PREFIX, type)).rejects.toBeInstanceOf(BadRequestException);
-      expect(storage.createPresignedPost).not.toHaveBeenCalled();
-    });
+    it.each(['image/gif', 'image/svg+xml', 'text/html', ''])(
+      'recusa %j sem assinar nada',
+      async (type) => {
+        await expect(
+          service.createUpload('event_cover', PREFIX, type),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(storage.createPresignedPost).not.toHaveBeenCalled();
+      },
+    );
 
     it('bucket fora do ar vira 503', async () => {
-      storage.createPresignedPost.mockRejectedValue(new ObjectStorageUnavailableError('down'));
-      await expect(service.createUpload('event_cover', PREFIX, 'image/png')).rejects.toBeInstanceOf(
-        ServiceUnavailableException,
+      storage.createPresignedPost.mockRejectedValue(
+        new ObjectStorageUnavailableError('down'),
       );
+      await expect(
+        service.createUpload('event_cover', PREFIX, 'image/png'),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
       expect(metrics.uploadUrlIssued).not.toHaveBeenCalled();
     });
   });
 
   describe('confirmUpload', () => {
     it('confere tamanho, tipo e assinatura e conta a confirmação', async () => {
-      await expect(service.confirmUpload('event_cover', PREFIX, KEY)).resolves.toBeUndefined();
+      await expect(
+        service.confirmUpload('event_cover', PREFIX, KEY),
+      ).resolves.toBeUndefined();
       expect(storage.headObject).toHaveBeenCalledWith(KEY);
       expect(storage.readPrefix).toHaveBeenCalledWith(KEY, 12);
       expect(metrics.uploadConfirmed).toHaveBeenCalledWith('event_cover');
@@ -108,60 +137,105 @@ describe('ImageStorageService', () => {
     });
 
     it.each([
-      ['de outro evento', 'events/4/cover/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png'],
+      [
+        'de outro evento',
+        'events/4/cover/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png',
+      ],
       ['forjada', 'events/3/cover/minha-foto.png'],
-      ['de outro usuário', 'users/u2/avatar/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png'],
+      [
+        'de outro usuário',
+        'users/u2/avatar/0b7c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f.png',
+      ],
     ])('recusa chave %s sem consultar nem apagar nada', async (_case, key) => {
-      await expect(service.confirmUpload('event_cover', PREFIX, key)).rejects.toThrow('Chave de upload inválida');
+      await expect(
+        service.confirmUpload('event_cover', PREFIX, key),
+      ).rejects.toThrow('Chave de upload inválida');
       expect(storage.headObject).not.toHaveBeenCalled();
       expect(storage.deleteObject).not.toHaveBeenCalled();
-      expect(metrics.uploadRejected).toHaveBeenCalledWith('event_cover', 'invalid_key');
+      expect(metrics.uploadRejected).toHaveBeenCalledWith(
+        'event_cover',
+        'invalid_key',
+      );
     });
 
     it('objeto que não existe: 400 sem apagar', async () => {
       storage.headObject.mockResolvedValue(null);
-      await expect(service.confirmUpload('event_cover', PREFIX, KEY)).rejects.toThrow('não foi encontrado');
+      await expect(
+        service.confirmUpload('event_cover', PREFIX, KEY),
+      ).rejects.toThrow('não foi encontrado');
       expect(storage.deleteObject).not.toHaveBeenCalled();
-      expect(metrics.uploadRejected).toHaveBeenCalledWith('event_cover', 'missing');
+      expect(metrics.uploadRejected).toHaveBeenCalledWith(
+        'event_cover',
+        'missing',
+      );
     });
 
     it.each([
-      ['grande demais', { size: MAX_IMAGE_BYTES + 1, contentType: 'image/png' }, 'too_large'],
+      [
+        'grande demais',
+        { size: MAX_IMAGE_BYTES + 1, contentType: 'image/png' },
+        'too_large',
+      ],
       ['vazio', { size: 0, contentType: 'image/png' }, 'too_large'],
-      ['tipo diferente da extensão', { size: 10, contentType: 'image/jpeg' }, 'invalid_type'],
+      [
+        'tipo diferente da extensão',
+        { size: 10, contentType: 'image/jpeg' },
+        'invalid_type',
+      ],
       ['sem tipo', { size: 10, contentType: null }, 'invalid_type'],
       ['html', { size: 10, contentType: 'text/html' }, 'invalid_type'],
     ])('objeto %s: 400 e o objeto é apagado', async (_case, head, reason) => {
       storage.headObject.mockResolvedValue(head);
-      await expect(service.confirmUpload('event_photo', PREFIX, KEY)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.confirmUpload('event_photo', PREFIX, KEY),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(storage.deleteObject).toHaveBeenCalledWith(KEY);
-      expect(metrics.uploadRejected).toHaveBeenCalledWith('event_photo', reason);
+      expect(metrics.uploadRejected).toHaveBeenCalledWith(
+        'event_photo',
+        reason,
+      );
       expect(metrics.uploadConfirmed).not.toHaveBeenCalled();
     });
 
     it('bytes que não são PNG: 400 invalid_content e o objeto é apagado', async () => {
-      storage.readPrefix.mockResolvedValue(new TextEncoder().encode('<html><body>'));
-      await expect(service.confirmUpload('event_cover', PREFIX, KEY)).rejects.toThrow('não é uma imagem válida');
+      storage.readPrefix.mockResolvedValue(
+        new TextEncoder().encode('<html><body>'),
+      );
+      await expect(
+        service.confirmUpload('event_cover', PREFIX, KEY),
+      ).rejects.toThrow('não é uma imagem válida');
       expect(storage.deleteObject).toHaveBeenCalledWith(KEY);
-      expect(metrics.uploadRejected).toHaveBeenCalledWith('event_cover', 'invalid_content');
+      expect(metrics.uploadRejected).toHaveBeenCalledWith(
+        'event_cover',
+        'invalid_content',
+      );
     });
 
     it('aceita exatamente 5 MB', async () => {
-      storage.headObject.mockResolvedValue({ size: MAX_IMAGE_BYTES, contentType: 'image/png' });
-      await expect(service.confirmUpload('event_cover', PREFIX, KEY)).resolves.toBeUndefined();
+      storage.headObject.mockResolvedValue({
+        size: MAX_IMAGE_BYTES,
+        contentType: 'image/png',
+      });
+      await expect(
+        service.confirmUpload('event_cover', PREFIX, KEY),
+      ).resolves.toBeUndefined();
     });
 
     it('bucket fora do ar vira 503', async () => {
-      storage.headObject.mockRejectedValue(new ObjectStorageUnavailableError('down'));
-      await expect(service.confirmUpload('event_cover', PREFIX, KEY)).rejects.toBeInstanceOf(
-        ServiceUnavailableException,
+      storage.headObject.mockRejectedValue(
+        new ObjectStorageUnavailableError('down'),
       );
+      await expect(
+        service.confirmUpload('event_cover', PREFIX, KEY),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
     it('erro inesperado do bucket (ex.: 403 de credencial) propaga como está', async () => {
       const forbidden = new Error('AccessDenied');
       storage.headObject.mockRejectedValue(forbidden);
-      await expect(service.confirmUpload('event_cover', PREFIX, KEY)).rejects.toBe(forbidden);
+      await expect(
+        service.confirmUpload('event_cover', PREFIX, KEY),
+      ).rejects.toBe(forbidden);
     });
   });
 
@@ -177,8 +251,12 @@ describe('ImageStorageService', () => {
     });
 
     it('falha vira log e métrica, nunca erro', async () => {
-      storage.deleteObject.mockRejectedValue(new ObjectStorageUnavailableError('down'));
-      await expect(service.deleteQuietly('event_photo', KEY)).resolves.toBeUndefined();
+      storage.deleteObject.mockRejectedValue(
+        new ObjectStorageUnavailableError('down'),
+      );
+      await expect(
+        service.deleteQuietly('event_photo', KEY),
+      ).resolves.toBeUndefined();
       expect(metrics.objectDeleteFailed).toHaveBeenCalledWith('event_photo');
       expect(warn).toHaveBeenCalled();
     });

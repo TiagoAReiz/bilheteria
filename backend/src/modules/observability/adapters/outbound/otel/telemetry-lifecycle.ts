@@ -6,17 +6,17 @@ type ShutdownFn = () => Promise<void>;
 let shutdownFn: ShutdownFn | undefined;
 
 export function registerTelemetryShutdown(fn: ShutdownFn): void {
-    shutdownFn = fn;
+  shutdownFn = fn;
 }
 
 // Envia o que ainda está em buffer (spans, métricas, logs) e encerra o SDK. Nunca lança:
 // falha ao exportar não pode impedir o processo de terminar.
 export async function shutdownTelemetry(): Promise<void> {
-    const fn = shutdownFn;
-    shutdownFn = undefined;
-    try {
-        await fn?.();
-    } catch (error) {
-        console.error('Falha ao encerrar o OpenTelemetry', error);
-    }
+  const fn = shutdownFn;
+  shutdownFn = undefined;
+  try {
+    await fn?.();
+  } catch (error) {
+    console.error('Falha ao encerrar o OpenTelemetry', error);
+  }
 }

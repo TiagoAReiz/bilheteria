@@ -100,7 +100,9 @@ describe('TicketService', () => {
     // tracing de verdade fica no OtelTracing; aqui só executa o trabalho com um span fake
     span = { setAttributes: vi.fn() };
     tracing = {
-      inSpan: vi.fn((_name, _attributes, work) => work(span)) as MockPort<TracingPort>['inSpan'],
+      inSpan: vi.fn((_name, _attributes, work) =>
+        work(span),
+      ) as MockPort<TracingPort>['inSpan'],
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -170,7 +172,9 @@ describe('TicketService', () => {
     });
 
     it('retorna o ticket quando o repositório reserva e usa o limite por CPF do evento', async () => {
-      eventService.getEventById.mockResolvedValue(makeEvent({ max_tickets_per_cpf: 4 }));
+      eventService.getEventById.mockResolvedValue(
+        makeEvent({ max_tickets_per_cpf: 4 }),
+      );
       const ticket = makeTicket();
       ticketRepository.reserveTicketWithinLimit.mockResolvedValue({
         outcome: 'reserved',
@@ -297,7 +301,9 @@ describe('TicketService', () => {
       });
 
       it('relança o NotFound original do evento', async () => {
-        const notFound = new NotFoundException('O evento 10 não foi encontrado');
+        const notFound = new NotFoundException(
+          'O evento 10 não foi encontrado',
+        );
         eventService.getEventById.mockRejectedValue(notFound);
 
         await expect(service.reserveTicket('user-1', 10)).rejects.toBe(
@@ -309,9 +315,7 @@ describe('TicketService', () => {
         const failure = new Error('connection refused');
         ticketRepository.reserveTicketWithinLimit.mockRejectedValue(failure);
 
-        await expect(service.reserveTicket('user-1', 10)).rejects.toBe(
-          failure,
-        );
+        await expect(service.reserveTicket('user-1', 10)).rejects.toBe(failure);
         expect(metrics.reservationAttempted).not.toHaveBeenCalled();
       });
 
@@ -319,9 +323,7 @@ describe('TicketService', () => {
         const failure = new Error('timeout');
         eventService.getEventById.mockRejectedValue(failure);
 
-        await expect(service.reserveTicket('user-1', 10)).rejects.toBe(
-          failure,
-        );
+        await expect(service.reserveTicket('user-1', 10)).rejects.toBe(failure);
         expect(metrics.reservationAttempted).not.toHaveBeenCalled();
       });
     });
@@ -371,7 +373,12 @@ describe('TicketService', () => {
   });
 
   describe('listMyTickets', () => {
-    const event = { id: 10, name: 'Show', location: 'Arena', starts_at: new Date('2026-12-20T20:00:00Z') };
+    const event = {
+      id: 10,
+      name: 'Show',
+      location: 'Arena',
+      starts_at: new Date('2026-12-20T20:00:00Z'),
+    };
 
     it('busca só pagos e reservas dentro do TTL (corte = agora - 5 min)', async () => {
       ticketRepository.getActiveTicketsByUser.mockResolvedValue([]);
@@ -386,13 +393,23 @@ describe('TicketService', () => {
     it('pago vira paid sem prazo; reserva vira reserved com fim = reserved_at + TTL', async () => {
       const reservedAt = new Date(NOW.getTime() - 60 * 1000);
       ticketRepository.getActiveTicketsByUser.mockResolvedValue([
-        { id: 1, is_paid: true, reserved_at: new Date('2026-06-01T00:00:00Z'), event },
+        {
+          id: 1,
+          is_paid: true,
+          reserved_at: new Date('2026-06-01T00:00:00Z'),
+          event,
+        },
         { id: 2, is_paid: false, reserved_at: reservedAt, event },
       ]);
 
       await expect(service.listMyTickets('user-1')).resolves.toEqual([
         { id: 1, status: 'paid', reserved_until: null, event },
-        { id: 2, status: 'reserved', reserved_until: new Date(reservedAt.getTime() + 5 * 60 * 1000), event },
+        {
+          id: 2,
+          status: 'reserved',
+          reserved_until: new Date(reservedAt.getTime() + 5 * 60 * 1000),
+          event,
+        },
       ]);
     });
   });

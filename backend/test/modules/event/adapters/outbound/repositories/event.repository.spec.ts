@@ -27,7 +27,9 @@ describe('EventRepository', () => {
     prisma = {
       event: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
       $executeRaw: vi.fn(),
-      $transaction: vi.fn(async (callback: (t: typeof tx) => unknown) => callback(tx)),
+      $transaction: vi.fn(async (callback: (t: typeof tx) => unknown) =>
+        callback(tx),
+      ),
     };
     tx = {
       $queryRaw: vi.fn().mockResolvedValue([]),
@@ -244,10 +246,15 @@ describe('EventRepository', () => {
 
       await expect(
         repository.updateWithTickets(7, { capacity: 5, name: 'Novo' }, check),
-      ).resolves.toEqual({ outcome: 'updated', event: { ...current, capacity: 5 } });
+      ).resolves.toEqual({
+        outcome: 'updated',
+        event: { ...current, capacity: 5 },
+      });
 
       expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
-      expect(String(tx.$queryRaw.mock.calls[0][0].join('?'))).toContain('FOR UPDATE');
+      expect(String(tx.$queryRaw.mock.calls[0][0].join('?'))).toContain(
+        'FOR UPDATE',
+      );
       expect(check).toHaveBeenCalledWith(current);
       expect(tx.ticket.createMany).toHaveBeenCalledWith({
         data: [
@@ -269,17 +276,27 @@ describe('EventRepository', () => {
       tx.event.findFirst.mockResolvedValue(current);
       tx.event.update.mockResolvedValue(current);
 
-      await repository.updateWithTickets(7, { max_tickets_per_cpf: 3 }, () => null);
+      await repository.updateWithTickets(
+        7,
+        { max_tickets_per_cpf: 3 },
+        () => null,
+      );
 
       expect(tx.ticket.createMany).not.toHaveBeenCalled();
-      expect(tx.event.update.mock.calls[0][0].data).not.toHaveProperty('available_tickets');
+      expect(tx.event.update.mock.calls[0][0].data).not.toHaveProperty(
+        'available_tickets',
+      );
     });
 
     it('recusa sem gravar nada quando a regra recusa', async () => {
       tx.event.findFirst.mockResolvedValue(current);
 
       await expect(
-        repository.updateWithTickets(7, { capacity: 2 }, () => 'capacity_decrease'),
+        repository.updateWithTickets(
+          7,
+          { capacity: 2 },
+          () => 'capacity_decrease',
+        ),
       ).resolves.toEqual({ outcome: 'rejected', reason: 'capacity_decrease' });
       expect(tx.ticket.createMany).not.toHaveBeenCalled();
       expect(tx.event.update).not.toHaveBeenCalled();
@@ -287,7 +304,9 @@ describe('EventRepository', () => {
 
     it('NotFound para evento inexistente ou excluído', async () => {
       tx.event.findFirst.mockResolvedValue(null);
-      await expect(repository.updateWithTickets(9, {}, () => null)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        repository.updateWithTickets(9, {}, () => null),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

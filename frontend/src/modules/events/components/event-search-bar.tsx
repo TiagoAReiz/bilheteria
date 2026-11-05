@@ -5,7 +5,11 @@ import { Button } from "@/shared/components/ui/button";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
-import { hasActiveFilters, type EventSearchFilters, type LocationFacet } from "../types/event-search.dto";
+import {
+  hasActiveFilters,
+  type EventSearchFilters,
+  type LocationFacet,
+} from "../types/event-search.dto";
 import { EventSearchInput } from "./event-search-input";
 
 interface EventSearchBarProps {
@@ -22,12 +26,24 @@ interface EventSearchBarProps {
 const SELECT_CLASS =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";
 
-export function EventSearchBar({ filters, onFiltersChange, locations, active, searching, onSearch, onClear }: EventSearchBarProps) {
-  function update<K extends keyof EventSearchFilters>(key: K, value: EventSearchFilters[K]) {
+export function EventSearchBar({
+  filters,
+  onFiltersChange,
+  locations,
+  active,
+  searching,
+  onSearch,
+  onClear,
+}: EventSearchBarProps) {
+  function update<K extends keyof EventSearchFilters>(
+    key: K,
+    value: EventSearchFilters[K],
+  ) {
     onFiltersChange({ ...filters, [key]: value });
   }
 
-  const invalidPeriod = filters.from !== "" && filters.to !== "" && filters.from > filters.to;
+  const invalidPeriod =
+    filters.from !== "" && filters.to !== "" && filters.from > filters.to;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,12 +51,21 @@ export function EventSearchBar({ filters, onFiltersChange, locations, active, se
   }
 
   return (
-    <form role="search" aria-label="Buscar eventos" onSubmit={submit} className="space-y-4 rounded-xl border bg-card p-4">
+    <form
+      role="search"
+      aria-label="Buscar eventos"
+      onSubmit={submit}
+      className="space-y-4 rounded-xl border bg-card p-4"
+    >
       <div className="flex gap-2">
         <Label htmlFor="search-q" className="sr-only">
           Buscar eventos
         </Label>
-        <EventSearchInput id="search-q" value={filters.q} onChange={(q) => update("q", q)} />
+        <EventSearchInput
+          id="search-q"
+          value={filters.q}
+          onChange={(q) => update("q", q)}
+        />
         <Button type="submit" disabled={searching || invalidPeriod}>
           Buscar
         </Button>
@@ -89,7 +114,9 @@ export function EventSearchBar({ filters, onFiltersChange, locations, active, se
           <Checkbox
             id="search-available"
             checked={filters.onlyAvailable}
-            onCheckedChange={(checked) => update("onlyAvailable", checked === true)}
+            onCheckedChange={(checked) =>
+              update("onlyAvailable", checked === true)
+            }
           />
           <Label htmlFor="search-available">Só com ingressos disponíveis</Label>
         </div>

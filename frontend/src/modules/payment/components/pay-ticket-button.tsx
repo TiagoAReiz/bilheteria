@@ -1,7 +1,16 @@
 "use client";
 
-import { CreditCardIcon, Loader2Icon, TimerIcon, TriangleAlertIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import {
+  CreditCardIcon,
+  Loader2Icon,
+  TimerIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { useCheckout } from "../hooks/useCheckout";
 import { formatCountdown, useCountdown } from "../hooks/useCountdown";
@@ -23,7 +32,9 @@ export function PayTicketButton({ ticketId, expiresAt }: PayTicketButtonProps) {
         <TriangleAlertIcon aria-hidden />
         <AlertTitle>Sua reserva expirou</AlertTitle>
         <AlertDescription>
-          <p>O ingresso voltou a ficar disponível. Reserve de novo para pagar.</p>
+          <p>
+            O ingresso voltou a ficar disponível. Reserve de novo para pagar.
+          </p>
         </AlertDescription>
       </Alert>
     );
@@ -33,13 +44,23 @@ export function PayTicketButton({ ticketId, expiresAt }: PayTicketButtonProps) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <Button size="lg" onClick={() => void pay()} disabled={loading}>
-          {loading ? <Loader2Icon className="animate-spin" aria-hidden /> : <CreditCardIcon aria-hidden />}
+          {loading ? (
+            <Loader2Icon className="animate-spin" aria-hidden />
+          ) : (
+            <CreditCardIcon aria-hidden />
+          )}
           {loading ? "Abrindo pagamento..." : "Pagar"}
         </Button>
-        <p className="flex items-center gap-1 text-sm text-muted-foreground" aria-live="off">
+        <p
+          className="flex items-center gap-1 text-sm text-muted-foreground"
+          aria-live="off"
+        >
           <TimerIcon className="size-4" aria-hidden />
           Tempo para pagar:{" "}
-          <time className="font-medium tabular-nums" data-testid="payment-countdown">
+          <time
+            className="font-medium tabular-nums"
+            data-testid="payment-countdown"
+          >
             {formatCountdown(remainingMs)}
           </time>
         </p>

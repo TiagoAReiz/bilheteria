@@ -17,6 +17,8 @@ export interface User {
   updatedAt: string;
 }
 
-export function canCreateEvents(user: Pick<User, "role"> | null | undefined): boolean {
+export function canCreateEvents(
+  user: Pick<User, "role"> | null | undefined,
+): boolean {
   return user?.role === "ORGANIZER" || user?.role === "ADMIN";
 }

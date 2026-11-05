@@ -1,4 +1,4 @@
-import {ReservationOutcome} from "../../../../core/entities/reservation.entity.js";
+import { ReservationOutcome } from '../../../../core/entities/reservation.entity.js';
 
 export const TICKET_METRICS = Symbol('TICKET_METRICS');
 
@@ -6,5 +6,5 @@ export const TICKET_METRICS = Symbol('TICKET_METRICS');
 // Nunca recebem ids (usuário, evento, ticket): viram labels e explodiriam a cardinalidade.
 // As métricas de pagamento ficam na PAYMENT_METRICS (módulo payment), com os mesmos nomes de antes.
 export interface TicketMetricsPort {
-    reservationAttempted(outcome: ReservationOutcome, durationMs: number): void;
+  reservationAttempted(outcome: ReservationOutcome, durationMs: number): void;
 }

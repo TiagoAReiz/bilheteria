@@ -2,7 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { getErrorMessage } from "@/shared/lib/api-error";
-import { uploadToPresignedPost, validateImageFile } from "@/shared/lib/image-upload";
+import {
+  uploadToPresignedPost,
+  validateImageFile,
+} from "@/shared/lib/image-upload";
 import type { ImageContentType, PresignedUpload } from "@/shared/types/image";
 
 export interface ImageUploadSteps<T> {
@@ -12,7 +15,8 @@ export interface ImageUploadSteps<T> {
   confirm: (key: string) => Promise<T>;
 }
 
-export type ImageUploadResult<T> = { ok: true; value: T } | { ok: false; error: string };
+export type ImageUploadResult<T> =
+  { ok: true; value: T } | { ok: false; error: string };
 
 /**
  * Upload em três passos: checa tipo/tamanho no navegador, envia direto ao bucket com a URL
@@ -37,7 +41,10 @@ export function useImageUpload<T>(steps: ImageUploadSteps<T>) {
         await uploadToPresignedPost(presigned, file);
         return { ok: true, value: await confirm(presigned.key) };
       } catch (err) {
-        const message = getErrorMessage(err, "Não foi possível enviar a imagem.");
+        const message = getErrorMessage(
+          err,
+          "Não foi possível enviar a imagem.",
+        );
         setError(message);
         return { ok: false, error: message };
       } finally {

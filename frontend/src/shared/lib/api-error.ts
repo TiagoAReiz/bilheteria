@@ -16,12 +16,16 @@ export function getErrorStatus(error: unknown): number | undefined {
 }
 
 /** Extrai uma mensagem legível de um erro do axios/Nest. */
-export function getErrorMessage(error: unknown, fallback = "Algo deu errado. Tente novamente."): string {
+export function getErrorMessage(
+  error: unknown,
+  fallback = "Algo deu errado. Tente novamente.",
+): string {
   if (isAxiosError(error)) {
     const data = error.response?.data;
     if (isNestErrorBody(data)) {
       const { message } = data;
-      if (Array.isArray(message)) return message.filter(Boolean).join("\n") || fallback;
+      if (Array.isArray(message))
+        return message.filter(Boolean).join("\n") || fallback;
       if (typeof message === "string" && message.trim()) return message;
     }
     if (!error.response) return "Não foi possível conectar ao servidor.";

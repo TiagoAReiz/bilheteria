@@ -8,7 +8,13 @@ import type { User } from "@/shared/types/user";
 import { useAvatar } from "../hooks/useAvatar";
 
 /** Trocar a foto de perfil; "Remover" só aparece quando há uma foto enviada (volta para a do Google). */
-export function AvatarEditor({ user, onChanged }: { user: Pick<User, "avatarKey">; onChanged?: () => Promise<void> | void }) {
+export function AvatarEditor({
+  user,
+  onChanged,
+}: {
+  user: Pick<User, "avatarKey">;
+  onChanged?: () => Promise<void> | void;
+}) {
   const { change, remove, uploading, removing } = useAvatar(onChanged);
 
   async function handle(operation: Promise<string | null>, success: string) {
@@ -23,7 +29,9 @@ export function AvatarEditor({ user, onChanged }: { user: Pick<User, "avatarKey"
         label="Escolher foto de perfil"
         loading={uploading}
         disabled={removing}
-        onFile={(file) => void handle(change(file), "Foto de perfil atualizada.")}
+        onFile={(file) =>
+          void handle(change(file), "Foto de perfil atualizada.")
+        }
       >
         <CameraIcon aria-hidden /> Trocar foto
       </ImageFileButton>

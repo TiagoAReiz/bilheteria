@@ -6,19 +6,33 @@ import { NewEventForm } from "../components/new-event-form";
 import { newEventService } from "../services/new-event.service";
 
 const push = jest.fn();
-jest.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: jest.fn() }) }));
-jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
-jest.mock("../services/new-event.service", () => ({ newEventService: { create: jest.fn() } }));
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ push, replace: jest.fn() }),
+}));
+jest.mock("sonner", () => ({
+  toast: { success: jest.fn(), error: jest.fn() },
+}));
+jest.mock("../services/new-event.service", () => ({
+  newEventService: { create: jest.fn() },
+}));
 const create = jest.mocked(newEventService.create);
 
 async function fillValid() {
   await userEvent.type(screen.getByLabelText("Nome"), "Festival");
-  await userEvent.type(screen.getByLabelText("Descrição (opcional)"), "Música ao vivo");
+  await userEvent.type(
+    screen.getByLabelText("Descrição (opcional)"),
+    "Música ao vivo",
+  );
   await userEvent.type(screen.getByLabelText("Local"), "Parque");
   // datetime-local não aceita digitação no jsdom; define o valor diretamente
-  fireEvent.input(screen.getByLabelText("Data e horário"), { target: { value: "2099-06-01T20:00" } });
+  fireEvent.input(screen.getByLabelText("Data e horário"), {
+    target: { value: "2099-06-01T20:00" },
+  });
   await userEvent.type(screen.getByLabelText("Capacidade"), "500");
-  await userEvent.type(screen.getByLabelText("Preço do ingresso (R$)"), "89,90");
+  await userEvent.type(
+    screen.getByLabelText("Preço do ingresso (R$)"),
+    "89,90",
+  );
 }
 
 describe("<NewEventForm />", () => {
@@ -28,7 +42,9 @@ describe("<NewEventForm />", () => {
     render(<NewEventForm />);
     await userEvent.click(screen.getByRole("button", { name: "Criar evento" }));
 
-    expect(await screen.findByText("Informe o nome do evento")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Informe o nome do evento"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Informe o local")).toBeInTheDocument();
     expect(screen.getByText("Informe a data e o horário")).toBeInTheDocument();
     expect(screen.getByText("Informe a capacidade")).toBeInTheDocument();
@@ -67,7 +83,9 @@ describe("<NewEventForm />", () => {
     await userEvent.type(limit, "4");
     await userEvent.click(screen.getByRole("button", { name: "Criar evento" }));
 
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ max_tickets_per_cpf: 4 }));
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ max_tickets_per_cpf: 4 }),
+    );
   });
 
   it("limite por CPF acima de 10 mostra erro e não chama a API", async () => {
@@ -90,7 +108,9 @@ describe("<NewEventForm />", () => {
     await userEvent.type(price, "0,50");
     await userEvent.click(screen.getByRole("button", { name: "Criar evento" }));
 
-    expect(await screen.findByText(/O preço mínimo é R\$\s1,00/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/O preço mínimo é R\$\s1,00/),
+    ).toBeInTheDocument();
     expect(price).toHaveAttribute("aria-invalid", "true");
     expect(create).not.toHaveBeenCalled();
   });
@@ -101,16 +121,22 @@ describe("<NewEventForm />", () => {
     await fillValid();
     await userEvent.click(screen.getByRole("button", { name: "Criar evento" }));
 
-    expect(toast.error).toHaveBeenCalledWith("Apenas organizadores podem criar eventos.");
+    expect(toast.error).toHaveBeenCalledWith(
+      "Apenas organizadores podem criar eventos.",
+    );
     expect(push).not.toHaveBeenCalled();
   });
 
   it("400: mostra as mensagens de validação do backend", async () => {
-    create.mockRejectedValue(nestError(400, ["starts_at deve ser uma data futura"]));
+    create.mockRejectedValue(
+      nestError(400, ["starts_at deve ser uma data futura"]),
+    );
     render(<NewEventForm />);
     await fillValid();
     await userEvent.click(screen.getByRole("button", { name: "Criar evento" }));
 
-    expect(toast.error).toHaveBeenCalledWith("starts_at deve ser uma data futura");
+    expect(toast.error).toHaveBeenCalledWith(
+      "starts_at deve ser uma data futura",
+    );
   });
 });

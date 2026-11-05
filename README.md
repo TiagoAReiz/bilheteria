@@ -244,6 +244,23 @@ Tudo fica em [`infra/storage/`](infra/storage), incluído pelo `docker-compose.y
 - **Variáveis** do backend: `STORAGE_S3_*` e `STORAGE_PUBLIC_URL` (ver [backend/README.md](backend/README.md#variáveis-do-armazenamento)). Trocar para S3 de verdade, CloudFront ou R2 é só `.env`.
 - **Busca**: a capa vai para o índice `events` como `cover_key` (a URL é montada pela API). O `search-init` adiciona o campo ao índice existente (`infra/search/elasticsearch/mapping-additions/`, `PUT _mapping`, sem reindexar). Num ambiente que já existia: `docker compose run --rm search-init`, a migration (`npx prisma migrate deploy --config prisma7.config.ts`) e `docker compose restart sequin` (recarrega a transform). Eventos antigos só ganham `cover_key` no índice quando mudam (ou com o backfill do Sequin).
 
+## Emails (Resend / Mailpit)
+
+Emails transacionais saem pelo módulo `notification` do backend, com o padrão **outbox**: quem gera o fato grava o pedido de email na tabela `email_outbox` na **mesma transação**, e um worker (a cada 5s) envia depois, com novas tentativas.
+
+```
+webhook MP aprova ──► transação: ticket pago + payment approved + INSERT email_outbox (dedupe_key única)
+worker (5s) ──► reserva lote (FOR UPDATE SKIP LOCKED + lease 5min) ──► React Email ──► provedor
+                 sucesso: sent  ·  falha temporária: nova tentativa em 30s, 2min, 8min... (até 6)  ·  permanente: failed
+```
+
+- **Por que outbox**: o provedor fora do ar não derruba a confirmação do pagamento, nunca sai email de um fato que não foi gravado, e webhook repetido não duplica (a `dedupe_key`, ex. `ticket-confirmed:<paymentId>`, é única e vai como idempotency key para o provedor).
+- **Emails hoje**: ingresso confirmado (pagamento aprovado), para o comprador.
+- **Dev (`EMAIL_DRIVER=smtp`, padrão)**: o [`infra/email/`](infra/email) sobe o Mailpit (`axllent/mailpit:v1.31.5`). A API envia para `localhost:1025` e tudo aparece em **http://localhost:8025**; nada sai para a internet.
+- **Entrega real (`EMAIL_DRIVER=resend`)**: precisa de `RESEND_API_KEY`. Plano grátis: 3.000/mês, 100/dia. **Sem domínio verificado** o remetente tem que ser `onboarding@resend.dev` e o Resend **só entrega para o email da própria conta**; para qualquer outro destinatário responde 403 e o email vira `failed` (sem novas tentativas). Para enviar a usuários reais: verificar um domínio no Resend (registros SPF/DKIM no DNS) e trocar `EMAIL_FROM`.
+- **Conferir**: `SELECT kind, to_email, status, attempts, last_error FROM email_outbox ORDER BY created_at DESC;` e a métrica `bilheteria_emails_processed_total{kind, outcome}` no Prometheus.
+- **Variáveis**: `EMAIL_DRIVER`, `EMAIL_FROM`, `RESEND_API_KEY`, `SMTP_HOST`/`SMTP_PORT`, `EMAIL_DISPATCH_INTERVAL_MS` (ver `backend/.env.example`).
+
 ## Próximos passos
 
-Busca com Elasticsearch + Sequin, pagamento com Mercado Pago e imagens no S3 estão feitos. Falta o Faro no front (observabilidade do navegador) e, no pagamento, preço por setor e reconciliação periódica. Detalhes em [backend/README.md#próximos-passos](backend/README.md#próximos-passos).
+Busca com Elasticsearch + Sequin, pagamento com Mercado Pago, imagens no S3 e o email de ingresso confirmado estão feitos. Falta o Faro no front (observabilidade do navegador) e, no pagamento, preço por setor e reconciliação periódica. Detalhes em [backend/README.md#próximos-passos](backend/README.md#próximos-passos).

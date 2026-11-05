@@ -9,12 +9,25 @@ jest.mock("@/shared/lib/image-upload", () => ({
   uploadToPresignedPost: jest.fn(),
 }));
 jest.mock("../services/profile.service", () => ({
-  profileService: { createAvatarUpload: jest.fn(), confirmAvatar: jest.fn(), removeAvatar: jest.fn() },
+  profileService: {
+    createAvatarUpload: jest.fn(),
+    confirmAvatar: jest.fn(),
+    removeAvatar: jest.fn(),
+  },
 }));
 const svc = jest.mocked(profileService);
 
-const jpeg = () => new File([new Uint8Array([0xff, 0xd8, 0xff])], "eu.jpg", { type: "image/jpeg" });
-const presigned = { url: "http://s3/b", fields: { key: "users/u/avatar/a.jpg" }, key: "users/u/avatar/a.jpg", max_bytes: 1, expires_at: "" };
+const jpeg = () =>
+  new File([new Uint8Array([0xff, 0xd8, 0xff])], "eu.jpg", {
+    type: "image/jpeg",
+  });
+const presigned = {
+  url: "http://s3/b",
+  fields: { key: "users/u/avatar/a.jpg" },
+  key: "users/u/avatar/a.jpg",
+  max_bytes: 1,
+  expires_at: "",
+};
 
 describe("useAvatar", () => {
   beforeEach(() => {
@@ -24,7 +37,9 @@ describe("useAvatar", () => {
 
   it("troca a foto: presign, envio ao bucket, confirmação e recarrega perfil/sessão", async () => {
     svc.createAvatarUpload.mockResolvedValue(presigned);
-    svc.confirmAvatar.mockResolvedValue({ avatar_url: "http://cdn/users/u/avatar/a.jpg" });
+    svc.confirmAvatar.mockResolvedValue({
+      avatar_url: "http://cdn/users/u/avatar/a.jpg",
+    });
     const onChanged = jest.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => useAvatar(onChanged));
     const file = jpeg();
@@ -47,7 +62,9 @@ describe("useAvatar", () => {
 
     let failure: unknown;
     await act(async () => {
-      failure = await result.current.change(new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }));
+      failure = await result.current.change(
+        new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }),
+      );
     });
 
     expect(failure).toBe("Envie uma imagem JPEG, PNG ou WebP.");
@@ -57,7 +74,9 @@ describe("useAvatar", () => {
 
   it("confirmação recusada pela API não recarrega", async () => {
     svc.createAvatarUpload.mockResolvedValue(presigned);
-    svc.confirmAvatar.mockRejectedValue(nestError(400, "O arquivo enviado não é uma imagem válida"));
+    svc.confirmAvatar.mockRejectedValue(
+      nestError(400, "O arquivo enviado não é uma imagem válida"),
+    );
     const onChanged = jest.fn();
     const { result } = renderHook(() => useAvatar(onChanged));
 
@@ -67,12 +86,16 @@ describe("useAvatar", () => {
     });
 
     expect(failure).toBe("O arquivo enviado não é uma imagem válida");
-    expect(result.current.error).toBe("O arquivo enviado não é uma imagem válida");
+    expect(result.current.error).toBe(
+      "O arquivo enviado não é uma imagem válida",
+    );
     expect(onChanged).not.toHaveBeenCalled();
   });
 
   it("remove volta para a foto do provedor e recarrega", async () => {
-    svc.removeAvatar.mockResolvedValue({ avatar_url: "https://google/foto.jpg" });
+    svc.removeAvatar.mockResolvedValue({
+      avatar_url: "https://google/foto.jpg",
+    });
     const onChanged = jest.fn();
     const { result } = renderHook(() => useAvatar(onChanged));
 
@@ -88,7 +111,9 @@ describe("useAvatar", () => {
   });
 
   it("erro ao remover vira mensagem", async () => {
-    svc.removeAvatar.mockRejectedValue(nestError(503, "O armazenamento de imagens está indisponível."));
+    svc.removeAvatar.mockRejectedValue(
+      nestError(503, "O armazenamento de imagens está indisponível."),
+    );
     const { result } = renderHook(() => useAvatar());
 
     let failure: unknown;
@@ -97,6 +122,8 @@ describe("useAvatar", () => {
     });
 
     expect(failure).toBe("O armazenamento de imagens está indisponível.");
-    expect(result.current.error).toBe("O armazenamento de imagens está indisponível.");
+    expect(result.current.error).toBe(
+      "O armazenamento de imagens está indisponível.",
+    );
   });
 });

@@ -21,51 +21,70 @@ export interface EventFormFloors {
   minTicketsPerCpf?: number;
 }
 
-export function makeEventSchema({ minCapacity = 1, minTicketsPerCpf = MIN_TICKETS_PER_CPF }: EventFormFloors = {}) {
-  return z
-    .object({
-      name: z.string().trim().min(1, "Informe o nome do evento"),
-      description: z.string().trim().optional(),
-      location: z.string().trim().min(1, "Informe o local"),
-      starts_at: z
-        .string()
-        .min(1, "Informe a data e o horário")
-        .refine((v) => !Number.isNaN(new Date(v).getTime()), "Data inválida")
-        .refine((v) => new Date(v).getTime() > Date.now(), "A data precisa ser no futuro"),
-      capacity: z
-        .number({ error: "Informe a capacidade" })
-        .int("A capacidade deve ser um número inteiro")
-        .min(
-          minCapacity,
-          minCapacity === 1 ? "A capacidade mínima é 1" : `A capacidade não pode diminuir (mínimo ${minCapacity})`,
-        )
-        .max(MAX_CAPACITY, `A capacidade máxima é ${MAX_CAPACITY.toLocaleString("pt-BR")}`),
-      /** Em reais, como a pessoa digita (ex.: "50,00"); vira centavos no envio. */
-      price: z
-        .string()
-        .trim()
-        // uma mensagem por vez: a primeira regra que falhar
-        .superRefine((value, ctx) => {
-          const message = priceError(value);
-          if (message) ctx.addIssue({ code: "custom", message });
-        }),
-      max_tickets_per_cpf: z
-        .number({ error: "Informe o limite por CPF" })
-        .int("O limite deve ser um número inteiro")
-        .min(
-          minTicketsPerCpf,
-          minTicketsPerCpf === MIN_TICKETS_PER_CPF
-            ? `O limite mínimo é ${MIN_TICKETS_PER_CPF}`
-            : `O limite por CPF não pode diminuir (mínimo ${minTicketsPerCpf})`,
-        )
-        .max(MAX_TICKETS_PER_CPF, `O limite máximo é ${MAX_TICKETS_PER_CPF}`),
-    })
-    // o backend recusa limite maior que a capacidade
-    // (capacidade inválida já tem o próprio erro: não repete aqui)
-    .refine((v) => !Number.isInteger(v.capacity) || v.capacity < minCapacity || v.max_tickets_per_cpf <= v.capacity, {
-      path: ["max_tickets_per_cpf"],
-      message: "O limite por CPF não pode ser maior que a capacidade",
-    });
+export function makeEventSchema({
+  minCapacity = 1,
+  minTicketsPerCpf = MIN_TICKETS_PER_CPF,
+}: EventFormFloors = {}) {
+  return (
+    z
+      .object({
+        name: z.string().trim().min(1, "Informe o nome do evento"),
+        description: z.string().trim().optional(),
+        location: z.string().trim().min(1, "Informe o local"),
+        starts_at: z
+          .string()
+          .min(1, "Informe a data e o horário")
+          .refine((v) => !Number.isNaN(new Date(v).getTime()), "Data inválida")
+          .refine(
+            (v) => new Date(v).getTime() > Date.now(),
+            "A data precisa ser no futuro",
+          ),
+        capacity: z
+          .number({ error: "Informe a capacidade" })
+          .int("A capacidade deve ser um número inteiro")
+          .min(
+            minCapacity,
+            minCapacity === 1
+              ? "A capacidade mínima é 1"
+              : `A capacidade não pode diminuir (mínimo ${minCapacity})`,
+          )
+          .max(
+            MAX_CAPACITY,
+            `A capacidade máxima é ${MAX_CAPACITY.toLocaleString("pt-BR")}`,
+          ),
+        /** Em reais, como a pessoa digita (ex.: "50,00"); vira centavos no envio. */
+        price: z
+          .string()
+          .trim()
+          // uma mensagem por vez: a primeira regra que falhar
+          .superRefine((value, ctx) => {
+            const message = priceError(value);
+            if (message) ctx.addIssue({ code: "custom", message });
+          }),
+        max_tickets_per_cpf: z
+          .number({ error: "Informe o limite por CPF" })
+          .int("O limite deve ser um número inteiro")
+          .min(
+            minTicketsPerCpf,
+            minTicketsPerCpf === MIN_TICKETS_PER_CPF
+              ? `O limite mínimo é ${MIN_TICKETS_PER_CPF}`
+              : `O limite por CPF não pode diminuir (mínimo ${minTicketsPerCpf})`,
+          )
+          .max(MAX_TICKETS_PER_CPF, `O limite máximo é ${MAX_TICKETS_PER_CPF}`),
+      })
+      // o backend recusa limite maior que a capacidade
+      // (capacidade inválida já tem o próprio erro: não repete aqui)
+      .refine(
+        (v) =>
+          !Number.isInteger(v.capacity) ||
+          v.capacity < minCapacity ||
+          v.max_tickets_per_cpf <= v.capacity,
+        {
+          path: ["max_tickets_per_cpf"],
+          message: "O limite por CPF não pode ser maior que a capacidade",
+        },
+      )
+  );
 }
 
 export const newEventSchema = makeEventSchema();
@@ -74,15 +93,19 @@ function priceError(value: string): string | undefined {
   if (!value) return "Informe o preço do ingresso";
   const cents = parseReaisToCents(value);
   if (cents === null) return "Preço inválido. Use, por exemplo, 50,00";
-  if (cents < MIN_PRICE_CENTS) return `O preço mínimo é ${formatBRL(MIN_PRICE_CENTS)}`;
-  if (cents > MAX_PRICE_CENTS) return `O preço máximo é ${formatBRL(MAX_PRICE_CENTS)}`;
+  if (cents < MIN_PRICE_CENTS)
+    return `O preço mínimo é ${formatBRL(MIN_PRICE_CENTS)}`;
+  if (cents > MAX_PRICE_CENTS)
+    return `O preço máximo é ${formatBRL(MAX_PRICE_CENTS)}`;
   return undefined;
 }
 
 export type NewEventFormValues = z.infer<typeof newEventSchema>;
 
 /** Converte os valores do formulário (datetime-local no fuso do navegador) no body da API. */
-export function toCreateEventRequest(values: NewEventFormValues): CreateEventRequest {
+export function toCreateEventRequest(
+  values: NewEventFormValues,
+): CreateEventRequest {
   return {
     name: values.name,
     description: values.description ? values.description : undefined,
@@ -116,7 +139,8 @@ export function toEventFormValues(event: EventResponse): NewEventFormValues {
     location: event.location,
     starts_at: toDateTimeLocal(event.starts_at),
     capacity: event.capacity,
-    price: event.price_cents === null ? "" : centsToReaisInput(event.price_cents),
+    price:
+      event.price_cents === null ? "" : centsToReaisInput(event.price_cents),
     max_tickets_per_cpf: event.max_tickets_per_cpf,
   };
 }

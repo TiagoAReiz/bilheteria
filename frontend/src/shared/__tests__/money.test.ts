@@ -28,12 +28,19 @@ describe("money", () => {
     expect(parseReaisToCents(input)).toBe(cents);
   });
 
-  it.each(["", "abc", "-10", "10,999", "1,2,3", "12.34.56", "1.23,4", "1e3", "1234567890"])(
-    "parseReaisToCents(%p) = null",
-    (input) => {
-      expect(parseReaisToCents(input)).toBeNull();
-    },
-  );
+  it.each([
+    "",
+    "abc",
+    "-10",
+    "10,999",
+    "1,2,3",
+    "12.34.56",
+    "1.23,4",
+    "1e3",
+    "1234567890",
+  ])("parseReaisToCents(%p) = null", (input) => {
+    expect(parseReaisToCents(input)).toBeNull();
+  });
 
   it("não perde centavos com valores que dão erro em float", () => {
     // 0.1 + 0.2 em float = 0.30000000000000004

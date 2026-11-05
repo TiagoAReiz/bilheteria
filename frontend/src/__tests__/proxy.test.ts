@@ -14,7 +14,9 @@ describe("proxy", () => {
   it("redireciona para /login quando não há cookie de sessão", () => {
     const res = proxy(request("/profile"));
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe("http://localhost:3001/login?redirect=%2Fprofile");
+    expect(res.headers.get("location")).toBe(
+      "http://localhost:3001/login?redirect=%2Fprofile",
+    );
   });
 
   it("segue quando há cookie de sessão", () => {
@@ -24,11 +26,19 @@ describe("proxy", () => {
   });
 
   it("aceita o cookie com prefixo __Secure-", () => {
-    const res = proxy(request("/profile", "__Secure-better-auth.session_token=abc"));
+    const res = proxy(
+      request("/profile", "__Secure-better-auth.session_token=abc"),
+    );
     expect(res.headers.get("location")).toBeNull();
   });
 
   it("só roda nas rotas privadas", () => {
-    expect(config.matcher).toEqual(["/profile/:path*", "/events/new", "/events/:id/edit", "/payment/:path*", "/my-tickets/:path*"]);
+    expect(config.matcher).toEqual([
+      "/profile/:path*",
+      "/events/new",
+      "/events/:id/edit",
+      "/payment/:path*",
+      "/my-tickets/:path*",
+    ]);
   });
 });

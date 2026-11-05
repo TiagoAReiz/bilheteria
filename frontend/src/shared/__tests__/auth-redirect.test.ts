@@ -8,11 +8,28 @@ import {
 
 describe("auth-redirect (lógica do proxy)", () => {
   describe("isPrivatePath", () => {
-    it.each(["/profile", "/profile/x", "/events/new", "/payment/success", "/payment/failure", "/my-tickets", "/events/7/edit"])("%s é privada", (p) => {
+    it.each([
+      "/profile",
+      "/profile/x",
+      "/events/new",
+      "/payment/success",
+      "/payment/failure",
+      "/my-tickets",
+      "/events/7/edit",
+    ])("%s é privada", (p) => {
       expect(isPrivatePath(p)).toBe(true);
     });
 
-    it.each(["/", "/login", "/events/1", "/events/newer", "/profiles", "/payments", "/events/7", "/events/7/editar"])("%s é pública", (p) => {
+    it.each([
+      "/",
+      "/login",
+      "/events/1",
+      "/events/newer",
+      "/profiles",
+      "/payments",
+      "/events/7",
+      "/events/7/editar",
+    ])("%s é pública", (p) => {
       expect(isPrivatePath(p)).toBe(false);
     });
   });
@@ -23,7 +40,9 @@ describe("auth-redirect (lógica do proxy)", () => {
     });
 
     it("reconhece o cookie com prefixo __Secure- (HTTPS)", () => {
-      expect(hasSessionCookie(["__Secure-better-auth.session_token"])).toBe(true);
+      expect(hasSessionCookie(["__Secure-better-auth.session_token"])).toBe(
+        true,
+      );
     });
 
     it("ignora outros cookies", () => {
@@ -34,21 +53,33 @@ describe("auth-redirect (lógica do proxy)", () => {
 
   describe("getAuthRedirect", () => {
     it("redireciona rota privada sem sessão para /login com redirect", () => {
-      expect(getAuthRedirect({ pathname: "/profile", hasSession: false })).toBe("/login?redirect=%2Fprofile");
+      expect(getAuthRedirect({ pathname: "/profile", hasSession: false })).toBe(
+        "/login?redirect=%2Fprofile",
+      );
     });
 
     it("preserva a query string no redirect", () => {
-      expect(getAuthRedirect({ pathname: "/profile", search: "?redirect=/events/2", hasSession: false })).toBe(
+      expect(
+        getAuthRedirect({
+          pathname: "/profile",
+          search: "?redirect=/events/2",
+          hasSession: false,
+        }),
+      ).toBe(
         `/login?redirect=${encodeURIComponent("/profile?redirect=/events/2")}`,
       );
     });
 
     it("deixa passar rota privada com sessão", () => {
-      expect(getAuthRedirect({ pathname: "/events/new", hasSession: true })).toBeNull();
+      expect(
+        getAuthRedirect({ pathname: "/events/new", hasSession: true }),
+      ).toBeNull();
     });
 
     it("deixa passar rota pública sem sessão", () => {
-      expect(getAuthRedirect({ pathname: "/events/3", hasSession: false })).toBeNull();
+      expect(
+        getAuthRedirect({ pathname: "/events/3", hasSession: false }),
+      ).toBeNull();
     });
   });
 
@@ -57,12 +88,16 @@ describe("auth-redirect (lógica do proxy)", () => {
       expect(safeRedirectPath("/events/1?x=1")).toBe("/events/1?x=1");
     });
 
-    it.each([null, "", "https://evil.com", "//evil.com", "/\\evil.com", "javascript:alert(1)"])(
-      "rejeita %p",
-      (value) => {
-        expect(safeRedirectPath(value)).toBe("/");
-      },
-    );
+    it.each([
+      null,
+      "",
+      "https://evil.com",
+      "//evil.com",
+      "/\\evil.com",
+      "javascript:alert(1)",
+    ])("rejeita %p", (value) => {
+      expect(safeRedirectPath(value)).toBe("/");
+    });
   });
 
   it("buildLoginUrl codifica o destino", () => {

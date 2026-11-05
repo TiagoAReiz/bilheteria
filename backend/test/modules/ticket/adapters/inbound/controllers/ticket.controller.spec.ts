@@ -66,7 +66,19 @@ describe('TicketController', () => {
 
   describe('myTickets', () => {
     it('lista os ingressos do usuário da sessão', async () => {
-      const mine = [{ id: 1, status: 'paid' as const, reserved_until: null, event: { id: 10, name: 'Show', location: 'Arena', starts_at: new Date() } }];
+      const mine = [
+        {
+          id: 1,
+          status: 'paid' as const,
+          reserved_until: null,
+          event: {
+            id: 10,
+            name: 'Show',
+            location: 'Arena',
+            starts_at: new Date(),
+          },
+        },
+      ];
       ticketService.listMyTickets.mockResolvedValue(mine);
 
       await expect(controller.myTickets(session)).resolves.toBe(mine);
@@ -77,7 +89,9 @@ describe('TicketController', () => {
       const handler = handlerOf(TicketController, 'myTickets');
       expect(reflector.get(PUBLIC_KEY, handler)).toBeUndefined();
       expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('/tickets/me');
-      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.GET);
+      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
+        RequestMethod.GET,
+      );
     });
   });
 
@@ -106,11 +120,12 @@ describe('TicketController', () => {
   it('não expõe mais a confirmação manual de pagamento', () => {
     const routes = Object.getOwnPropertyNames(TicketController.prototype)
       .filter((name) => name !== 'constructor')
-      .map((name) =>
-        Reflect.getMetadata(
-          PATH_METADATA,
-          handlerOf(TicketController, name as keyof TicketController),
-        ) as unknown,
+      .map(
+        (name) =>
+          Reflect.getMetadata(
+            PATH_METADATA,
+            handlerOf(TicketController, name as keyof TicketController),
+          ) as unknown,
       );
     expect(routes).toEqual(['/status/:id', '/tickets/me', '/reservation']);
   });

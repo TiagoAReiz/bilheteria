@@ -37,22 +37,40 @@ interface EventFormProps {
 }
 
 /** Campos do evento, compartilhados entre criar e editar. */
-export function EventForm({ defaultValues, floors, submitLabel, submittingLabel, loading, onSubmit }: EventFormProps) {
+export function EventForm({
+  defaultValues,
+  floors,
+  submitLabel,
+  submittingLabel,
+  loading,
+  onSubmit,
+}: EventFormProps) {
   const editing = Boolean(floors);
   const minCapacity = floors?.minCapacity ?? 1;
   const minTicketsPerCpf = floors?.minTicketsPerCpf ?? MIN_TICKETS_PER_CPF;
-  const schema = useMemo(() => makeEventSchema({ minCapacity, minTicketsPerCpf }), [minCapacity, minTicketsPerCpf]);
+  const schema = useMemo(
+    () => makeEventSchema({ minCapacity, minTicketsPerCpf }),
+    [minCapacity, minTicketsPerCpf],
+  );
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<NewEventFormValues>({ resolver: zodResolver(schema), defaultValues });
+  } = useForm<NewEventFormValues>({
+    resolver: zodResolver(schema),
+    defaultValues,
+  });
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       <div className="space-y-2">
         <Label htmlFor="name">Nome</Label>
-        <Input id="name" aria-invalid={!!errors.name || undefined} aria-describedby="name-error" {...register("name")} />
+        <Input
+          id="name"
+          aria-invalid={!!errors.name || undefined}
+          aria-describedby="name-error"
+          {...register("name")}
+        />
         <FieldError id="name-error" message={errors.name?.message} />
       </div>
 
@@ -82,7 +100,10 @@ export function EventForm({ defaultValues, floors, submitLabel, submittingLabel,
             aria-describedby="starts_at-error"
             {...register("starts_at")}
           />
-          <FieldError id="starts_at-error" message={errors.starts_at?.message} />
+          <FieldError
+            id="starts_at-error"
+            message={errors.starts_at?.message}
+          />
         </div>
 
         <div className="space-y-2">
@@ -94,7 +115,9 @@ export function EventForm({ defaultValues, floors, submitLabel, submittingLabel,
             max={MAX_CAPACITY}
             step={1}
             aria-invalid={!!errors.capacity || undefined}
-            aria-describedby={editing ? "capacity-hint capacity-error" : "capacity-error"}
+            aria-describedby={
+              editing ? "capacity-hint capacity-error" : "capacity-error"
+            }
             {...register("capacity", { valueAsNumber: true })}
           />
           {editing ? (
@@ -119,7 +142,8 @@ export function EventForm({ defaultValues, floors, submitLabel, submittingLabel,
             {...register("price")}
           />
           <p id="price-hint" className="text-sm text-muted-foreground">
-            Preço único para todos os ingressos do evento, cobrado pelo Mercado Pago.
+            Preço único para todos os ingressos do evento, cobrado pelo Mercado
+            Pago.
           </p>
           <FieldError id="price-error" message={errors.price?.message} />
         </div>
@@ -136,12 +160,18 @@ export function EventForm({ defaultValues, floors, submitLabel, submittingLabel,
             aria-describedby="max_tickets_per_cpf-hint max_tickets_per_cpf-error"
             {...register("max_tickets_per_cpf", { valueAsNumber: true })}
           />
-          <p id="max_tickets_per_cpf-hint" className="text-sm text-muted-foreground">
+          <p
+            id="max_tickets_per_cpf-hint"
+            className="text-sm text-muted-foreground"
+          >
             {editing
               ? `Só pode aumentar (até ${MAX_TICKETS_PER_CPF}): diminuir o limite não é permitido.`
               : `Quantos ingressos cada pessoa (CPF) pode reservar ou comprar neste evento, de ${MIN_TICKETS_PER_CPF} a ${MAX_TICKETS_PER_CPF}. Depois de criado, o limite só pode aumentar.`}
           </p>
-          <FieldError id="max_tickets_per_cpf-error" message={errors.max_tickets_per_cpf?.message} />
+          <FieldError
+            id="max_tickets_per_cpf-error"
+            message={errors.max_tickets_per_cpf?.message}
+          />
         </div>
       </div>
 

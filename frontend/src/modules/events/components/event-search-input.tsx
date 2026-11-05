@@ -7,7 +7,10 @@ import { Input } from "@/shared/components/ui/input";
 import { cn } from "@/shared/lib/utils";
 import { formatShortDateTime } from "@/shared/lib/format";
 import { useEventSuggestions } from "../hooks/useEventSuggestions";
-import { MAX_QUERY_LENGTH, type EventSuggestion } from "../types/event-search.dto";
+import {
+  MAX_QUERY_LENGTH,
+  type EventSuggestion,
+} from "../types/event-search.dto";
 
 interface EventSearchInputProps {
   id: string;
@@ -19,7 +22,11 @@ interface EventSearchInputProps {
  * Campo de texto com autocomplete (padrão ARIA combobox). Escolher uma sugestão abre o evento;
  * Enter sem sugestão destacada envia o formulário (busca completa).
  */
-export function EventSearchInput({ id, value, onChange }: EventSearchInputProps) {
+export function EventSearchInput({
+  id,
+  value,
+  onChange,
+}: EventSearchInputProps) {
   const router = useRouter();
   const listId = useId();
   const { suggestions, loading } = useEventSuggestions(value);
@@ -54,7 +61,10 @@ export function EventSearchInput({ id, value, onChange }: EventSearchInputProps)
 
   return (
     <div className="relative flex-1">
-      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+      <SearchIcon
+        className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+        aria-hidden
+      />
       <Input
         id={id}
         type="search"
@@ -62,7 +72,9 @@ export function EventSearchInput({ id, value, onChange }: EventSearchInputProps)
         aria-expanded={expanded}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={expanded && active >= 0 ? `${listId}-${active}` : undefined}
+        aria-activedescendant={
+          expanded && active >= 0 ? `${listId}-${active}` : undefined
+        }
         autoComplete="off"
         maxLength={MAX_QUERY_LENGTH}
         placeholder="Buscar por evento, artista ou local"
@@ -98,7 +110,9 @@ export function EventSearchInput({ id, value, onChange }: EventSearchInputProps)
               aria-selected={index === active}
               className={cn(
                 "flex cursor-pointer flex-col gap-0.5 px-3 py-2 text-sm",
-                index === active ? "bg-accent text-accent-foreground" : "hover:bg-muted",
+                index === active
+                  ? "bg-accent text-accent-foreground"
+                  : "hover:bg-muted",
               )}
               // mousedown dispararia o blur do input antes do click e fecharia a lista
               onMouseDown={(event) => event.preventDefault()}
@@ -106,7 +120,8 @@ export function EventSearchInput({ id, value, onChange }: EventSearchInputProps)
             >
               <span className="font-medium">{suggestion.name}</span>
               <span className="text-xs text-muted-foreground">
-                {suggestion.location} · {formatShortDateTime(suggestion.starts_at)}
+                {suggestion.location} ·{" "}
+                {formatShortDateTime(suggestion.starts_at)}
               </span>
             </li>
           ))}

@@ -184,3 +184,33 @@ model payment {
     @@index([ticket_id, status])
     @@index([user_id])
 }
+
+enum EmailStatus {
+  pending
+  sent
+  failed
+}
+
+// Outbox de emails: quem gera o fato (ex.: pagamento aprovado) grava aqui na MESMA transação,
+// e o worker do módulo notification envia depois, com novas tentativas. O provedor fora do ar
+// nunca derruba a regra de negócio, e email só existe para fato que foi gravado.
+model email_outbox {
+    id                  String      @id @default(uuid())
+    kind                String
+    // um email por fato (ex.: ticket-confirmed:<paymentId>); também vira a idempotency key no provedor
+    dedupe_key          String      @unique
+    to_email            String
+    // retrato dos dados no momento do fato (o template monta o email a partir disto)
+    payload             Json
+    status              EmailStatus @default(pending)
+    attempts            Int         @default(0)
+    next_attempt_at     DateTime    @default(now())
+    last_error          String?
+    provider_message_id String?
+    sent_at             DateTime?
+    created_at          DateTime    @default(now())
+    updated_at          DateTime    @updatedAt
+
+    // o worker busca: status = pending AND next_attempt_at <= now()
+    @@index([status, next_attempt_at])
+}

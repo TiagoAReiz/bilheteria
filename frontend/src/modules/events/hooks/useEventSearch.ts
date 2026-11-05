@@ -45,17 +45,21 @@ export function useEventSearch() {
   useEffect(() => {
     if (!request) return;
     const controller = new AbortController();
-    eventSearchService.search(toSearchParams(request.filters, request.page), controller.signal).then(
-      (data) => setOutcome({ request, data, error: null }),
-      (err: unknown) => {
-        if (!controller.signal.aborted) setOutcome({ request, data: null, error: getErrorMessage(err) });
-      },
-    );
+    eventSearchService
+      .search(toSearchParams(request.filters, request.page), controller.signal)
+      .then(
+        (data) => setOutcome({ request, data, error: null }),
+        (err: unknown) => {
+          if (!controller.signal.aborted)
+            setOutcome({ request, data: null, error: getErrorMessage(err) });
+        },
+      );
     return () => controller.abort();
   }, [request]);
 
   // só vale o resultado da requisição atual (descarta respostas de buscas anteriores)
-  const current = request !== null && outcome?.request === request ? outcome : null;
+  const current =
+    request !== null && outcome?.request === request ? outcome : null;
 
   const search = useCallback((filters: EventSearchFilters) => {
     setRequest(hasActiveFilters(filters) ? { filters, page: 1 } : null);

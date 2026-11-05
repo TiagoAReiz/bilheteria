@@ -1,5 +1,11 @@
 import { Badge } from "@/shared/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/card";
 import { UserAvatar } from "@/shared/components/user-avatar";
 import type { Role, User } from "@/shared/types/user";
 import { AvatarEditor } from "./avatar-editor";
@@ -10,7 +16,13 @@ export const roleLabels: Record<Role, string> = {
   ADMIN: "Administrador",
 };
 
-export function ProfileCard({ user, onAvatarChanged }: { user: User; onAvatarChanged?: () => Promise<void> | void }) {
+export function ProfileCard({
+  user,
+  onAvatarChanged,
+}: {
+  user: User;
+  onAvatarChanged?: () => Promise<void> | void;
+}) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center gap-4">
@@ -26,7 +38,9 @@ export function ProfileCard({ user, onAvatarChanged }: { user: User; onAvatarCha
           <div>
             <dt className="text-muted-foreground">Perfil</dt>
             <dd>
-              <Badge variant="secondary">{roleLabels[user.role] ?? user.role}</Badge>
+              <Badge variant="secondary">
+                {roleLabels[user.role] ?? user.role}
+              </Badge>
             </dd>
           </div>
           <div>

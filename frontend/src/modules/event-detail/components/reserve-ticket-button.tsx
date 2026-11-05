@@ -2,9 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2Icon, Loader2Icon, TicketIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  Loader2Icon,
+  TicketIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -27,7 +36,11 @@ interface ReserveTicketButtonProps {
   onReserved?: () => void;
 }
 
-export function ReserveTicketButton({ eventId, disabled, onReserved }: ReserveTicketButtonProps) {
+export function ReserveTicketButton({
+  eventId,
+  disabled,
+  onReserved,
+}: ReserveTicketButtonProps) {
   const router = useRouter();
   const { user, status } = useSession();
   const { reserve, loading, result, error } = useReserveTicket(eventId);
@@ -67,7 +80,11 @@ export function ReserveTicketButton({ eventId, disabled, onReserved }: ReserveTi
         onClick={handleClick}
         disabled={disabled || loading || status === "loading"}
       >
-        {loading ? <Loader2Icon className="animate-spin" aria-hidden /> : <TicketIcon aria-hidden />}
+        {loading ? (
+          <Loader2Icon className="animate-spin" aria-hidden />
+        ) : (
+          <TicketIcon aria-hidden />
+        )}
         {loading ? "Reservando..." : "Reservar ingresso"}
       </Button>
 
@@ -77,11 +94,16 @@ export function ReserveTicketButton({ eventId, disabled, onReserved }: ReserveTi
           <AlertTitle>Reserva #{result.ticket.id} confirmada</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>
-              Sua reserva expira em {RESERVATION_TTL_MINUTES} minutos (às {formatTime(result.expiresAt)}) se o pagamento
-              não for concluído. Depois disso o ingresso volta a ficar disponível.
+              Sua reserva expira em {RESERVATION_TTL_MINUTES} minutos (às{" "}
+              {formatTime(result.expiresAt)}) se o pagamento não for concluído.
+              Depois disso o ingresso volta a ficar disponível.
             </p>
             {/* key: uma nova reserva recomeça a contagem e o estado do pagamento */}
-            <PayTicketButton key={result.ticket.id} ticketId={result.ticket.id} expiresAt={result.expiresAt} />
+            <PayTicketButton
+              key={result.ticket.id}
+              ticketId={result.ticket.id}
+              expiresAt={result.expiresAt}
+            />
           </AlertDescription>
         </Alert>
       ) : null}
@@ -93,7 +115,12 @@ export function ReserveTicketButton({ eventId, disabled, onReserved }: ReserveTi
           <AlertDescription>
             <p>{error.message}</p>
             {error.kind === "cpf_required" ? (
-              <Button variant="outline" size="sm" className="mt-2" onClick={() => setCpfDialogOpen(true)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => setCpfDialogOpen(true)}
+              >
                 Cadastrar CPF
               </Button>
             ) : null}
@@ -106,11 +133,15 @@ export function ReserveTicketButton({ eventId, disabled, onReserved }: ReserveTi
           <DialogHeader>
             <DialogTitle>Cadastre seu CPF para reservar</DialogTitle>
             <DialogDescription>
-              O CPF é obrigatório para reservar ingressos e limita quantos ingressos cada pessoa pode ter neste evento.
-              Ele é cadastrado uma única vez e não pode ser alterado depois. Assim que cadastrar, sua reserva continua.
+              O CPF é obrigatório para reservar ingressos e limita quantos
+              ingressos cada pessoa pode ter neste evento. Ele é cadastrado uma
+              única vez e não pode ser alterado depois. Assim que cadastrar, sua
+              reserva continua.
             </DialogDescription>
           </DialogHeader>
-          <CpfRegistrationForm onRegistered={() => void handleCpfRegistered()} />
+          <CpfRegistrationForm
+            onRegistered={() => void handleCpfRegistered()}
+          />
         </DialogContent>
       </Dialog>
     </div>
