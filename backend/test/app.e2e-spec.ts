@@ -37,6 +37,9 @@ const TEST_ENV: Record<string, string> = {
   STORAGE_S3_ACCESS_KEY_ID: 'test',
   STORAGE_S3_SECRET_ACCESS_KEY: 'test',
   STORAGE_PUBLIC_URL: 'http://cdn.e2e/bilheteria-images',
+  // Resend: o client não conecta ao subir; o worker da outbox fica desligado
+  RESEND_API_KEY: 're_e2e',
+  EMAIL_DISPATCH_INTERVAL_MS: '0',
 };
 
 // assina como o Mercado Pago: HMAC-SHA256 de id:<data.id>;request-id:<x-request-id>;ts:<ts>;

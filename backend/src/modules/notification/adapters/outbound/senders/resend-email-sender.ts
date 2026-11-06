@@ -1,3 +1,4 @@
+import type { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import {
   EmailSendError,
@@ -21,6 +22,9 @@ const PERMANENT_ERRORS = new Set([
   'invalid_attachment',
 ]);
 
+// Sem domínio verificado, o Resend só aceita este remetente (e só entrega para o dono da conta).
+export const DEFAULT_EMAIL_FROM = 'Bilheteria <onboarding@resend.dev>';
+
 /**
  * Envio pelo Resend. Sem domínio verificado só funciona com `from` em onboarding@resend.dev
  * e para o email da própria conta do Resend (outros destinatários recebem 403).
@@ -32,6 +36,14 @@ export class ResendEmailSender implements EmailSenderPort {
     private readonly client: Pick<Resend, 'emails'>,
     private readonly from: string,
   ) {}
+
+  /** RESEND_API_KEY é obrigatória: sem ela a API não sobe. */
+  static fromConfig(config: ConfigService): ResendEmailSender {
+    return new ResendEmailSender(
+      new Resend(config.getOrThrow<string>('RESEND_API_KEY')),
+      config.get<string>('EMAIL_FROM') || DEFAULT_EMAIL_FROM,
+    );
+  }
 
   async send(email: OutgoingEmail): Promise<{ providerMessageId: string }> {
     let response: Awaited<ReturnType<Resend['emails']['send']>>;

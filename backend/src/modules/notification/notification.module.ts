@@ -6,7 +6,7 @@ import { EmailDispatchService } from './application/services/email-dispatch.serv
 import { EmailOutboxRepository } from './adapters/outbound/repositories/email-outbox.repository.js';
 import { ReactEmailRenderer } from './adapters/outbound/renderers/react-email-renderer.js';
 import { OtelEmailMetrics } from './adapters/outbound/metrics/otel-email-metrics.js';
-import { createEmailSender } from './adapters/outbound/senders/email-sender.factory.js';
+import { ResendEmailSender } from './adapters/outbound/senders/resend-email-sender.js';
 import { EmailOutboxScheduler } from './adapters/inbound/schedulers/email-outbox.scheduler.js';
 import { EMAIL_DISPATCH_SERVICE } from './application/ports/inbound/services/email-dispatch.service.port.js';
 import { EMAIL_OUTBOX_REPOSITORY } from './application/ports/outbound/repositories/email-outbox.repository.port.js';
@@ -26,7 +26,8 @@ import { EMAIL_METRICS } from './application/ports/outbound/metrics/email-metric
     { provide: EMAIL_METRICS, useClass: OtelEmailMetrics },
     {
       provide: EMAIL_SENDER,
-      useFactory: createEmailSender,
+      useFactory: (config: ConfigService) =>
+        ResendEmailSender.fromConfig(config),
       inject: [ConfigService],
     },
     EmailOutboxScheduler,

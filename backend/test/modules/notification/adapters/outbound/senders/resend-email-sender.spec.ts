@@ -1,10 +1,8 @@
 import type { ConfigService } from '@nestjs/config';
-import { ResendEmailSender } from '../../../../../../src/modules/notification/adapters/outbound/senders/resend-email-sender.js';
-import { SmtpEmailSender } from '../../../../../../src/modules/notification/adapters/outbound/senders/smtp-email-sender.js';
 import {
   DEFAULT_EMAIL_FROM,
-  createEmailSender,
-} from '../../../../../../src/modules/notification/adapters/outbound/senders/email-sender.factory.js';
+  ResendEmailSender,
+} from '../../../../../../src/modules/notification/adapters/outbound/senders/resend-email-sender.js';
 import { EmailSendError } from '../../../../../../src/modules/notification/application/ports/outbound/senders/email-sender.port.js';
 
 const EMAIL = {
@@ -81,64 +79,17 @@ describe('ResendEmailSender', () => {
   });
 });
 
-describe('SmtpEmailSender', () => {
-  it('envia pelo transporte com o id da mensagem de volta', async () => {
-    const sendMail = vi.fn().mockResolvedValue({ messageId: '<id@local>' });
-    const sender = new SmtpEmailSender({ sendMail }, 'Bilheteria <a@b.com>');
-
-    await expect(sender.send(EMAIL)).resolves.toEqual({
-      providerMessageId: '<id@local>',
-    });
-    expect(sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        from: 'Bilheteria <a@b.com>',
-        to: 'm@example.com',
-        text: 'oi',
-      }),
-    );
-  });
-
-  it.each([
-    [550, true],
-    [421, false],
-    [undefined, false],
-  ])('resposta SMTP %s → permanente=%s', async (responseCode, permanent) => {
-    const sendMail = vi
-      .fn()
-      .mockRejectedValue(
-        Object.assign(new Error('recusado'), { responseCode }),
-      );
-    const error = await new SmtpEmailSender({ sendMail }, 'x')
-      .send(EMAIL)
-      .catch((e: unknown) => e);
-    expect((error as EmailSendError).permanent).toBe(permanent);
-  });
-});
-
-describe('createEmailSender', () => {
-  it('padrão é SMTP (Mailpit) com o remetente de teste do Resend', () => {
-    const sender = createEmailSender(configOf({}));
-    expect(sender).toBeInstanceOf(SmtpEmailSender);
+describe('ResendEmailSender.fromConfig', () => {
+  it('usa o remetente de teste do Resend por padrão', () => {
+    expect(
+      ResendEmailSender.fromConfig(configOf({ RESEND_API_KEY: 're_teste' })),
+    ).toBeInstanceOf(ResendEmailSender);
     expect(DEFAULT_EMAIL_FROM).toBe('Bilheteria <onboarding@resend.dev>');
   });
 
-  it('EMAIL_DRIVER=resend usa o Resend', () => {
-    expect(
-      createEmailSender(
-        configOf({ EMAIL_DRIVER: 'resend', RESEND_API_KEY: 're_teste' }),
-      ),
-    ).toBeInstanceOf(ResendEmailSender);
-  });
-
-  it('Resend sem RESEND_API_KEY não sobe', () => {
-    expect(() =>
-      createEmailSender(configOf({ EMAIL_DRIVER: 'resend' })),
-    ).toThrow(/RESEND_API_KEY/);
-  });
-
-  it('driver desconhecido não sobe', () => {
-    expect(() =>
-      createEmailSender(configOf({ EMAIL_DRIVER: 'sendgrid' })),
-    ).toThrow(/EMAIL_DRIVER inválido/);
+  it('sem RESEND_API_KEY não sobe', () => {
+    expect(() => ResendEmailSender.fromConfig(configOf({}))).toThrow(
+      /RESEND_API_KEY/,
+    );
   });
 });
