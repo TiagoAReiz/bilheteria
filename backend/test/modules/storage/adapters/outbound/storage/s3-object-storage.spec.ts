@@ -44,6 +44,7 @@ describe('readStorageSettings', () => {
       bucket: 'bilheteria-images',
       region: 'us-east-1',
       endpoint: 'http://localhost:4566',
+      presignEndpoint: 'http://localhost:4566',
       forcePathStyle: true,
       accessKeyId: 'test',
       secretAccessKey: 'test',
@@ -56,6 +57,7 @@ describe('readStorageSettings', () => {
       bucket: 'bilheteria-images',
       region: 'us-east-1',
       endpoint: undefined,
+      presignEndpoint: undefined,
       forcePathStyle: false,
       accessKeyId: undefined,
       secretAccessKey: undefined,
@@ -106,6 +108,30 @@ describe('S3ObjectStorage', () => {
     expect(`${endpoint.protocol}//${endpoint.hostname}:${endpoint.port}`).toBe(
       'http://localhost:4566',
     );
+  });
+
+  it('API no docker: assina com o endereço que o navegador alcança e fala com o S3 pela rede interna', async () => {
+    const docker = new S3ObjectStorage(
+      configOf({
+        ...LOCALSTACK_ENV,
+        STORAGE_S3_ENDPOINT: 'http://localstack:4566',
+        STORAGE_S3_PRESIGN_ENDPOINT: 'http://localhost:4566',
+      }),
+    );
+    vi.mocked(createPresignedPost).mockResolvedValue({ url: 'u', fields: {} });
+    await docker.createPresignedPost({
+      key: 'events/1/cover/a.png',
+      contentType: 'image/png',
+      maxBytes: 1,
+      expiresInSeconds: 60,
+    });
+
+    const hostOf = async (client: S3Client) =>
+      (await client.config.endpoint!()).hostname;
+    const signer = vi.mocked(createPresignedPost).mock.calls[0][0];
+    const internal = (docker as unknown as { client: S3Client }).client;
+    await expect(hostOf(signer)).resolves.toBe('localhost');
+    await expect(hostOf(internal)).resolves.toBe('localstack');
   });
 
   it('createPresignedPost: chave exata, Content-Type e Cache-Control fixos e content-length-range', async () => {

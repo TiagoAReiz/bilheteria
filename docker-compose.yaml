@@ -61,6 +61,8 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
       ELASTICSEARCH_URL: http://elasticsearch:9200
       STORAGE_S3_ENDPOINT: http://localstack:4566
+      # as URLs de upload pré-assinadas vão para o navegador, que não conhece o host `localstack`
+      STORAGE_S3_PRESIGN_ENDPOINT: http://localhost:4566
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
     depends_on:
       migrate:

@@ -26,6 +26,11 @@ export interface StorageSettings {
   region: string;
   /** Vazio = AWS S3 de verdade. LocalStack/MinIO/R2: a URL do serviço. */
   endpoint: string | undefined;
+  /**
+   * Endereço usado nas URLs pré-assinadas que vão para o navegador. Igual ao `endpoint`, a menos
+   * que a API alcance o S3 por um nome interno (ex.: `localstack` na rede do docker compose).
+   */
+  presignEndpoint: string | undefined;
   forcePathStyle: boolean;
   accessKeyId: string | undefined;
   secretAccessKey: string | undefined;
@@ -54,6 +59,7 @@ export function readStorageSettings(config: ConfigService): StorageSettings {
     bucket,
     region,
     endpoint,
+    presignEndpoint: get('STORAGE_S3_PRESIGN_ENDPOINT') ?? endpoint,
     forcePathStyle,
     accessKeyId: get('STORAGE_S3_ACCESS_KEY_ID'),
     secretAccessKey: get('STORAGE_S3_SECRET_ACCESS_KEY'),
@@ -102,17 +108,26 @@ function isUnavailable(error: unknown): boolean {
 export class S3ObjectStorage implements ObjectStoragePort, OnModuleDestroy {
   private readonly settings: StorageSettings;
   private readonly client: S3Client;
+  // só assina (não conecta): a URL gerada tem que ser alcançável pelo navegador
+  private readonly presignClient: S3Client;
 
   constructor(config: ConfigService) {
     this.settings = readStorageSettings(config);
     this.client = createS3Client(this.settings);
+    this.presignClient =
+      this.settings.presignEndpoint === this.settings.endpoint
+        ? this.client
+        : createS3Client({
+            ...this.settings,
+            endpoint: this.settings.presignEndpoint,
+          });
   }
 
   async createPresignedPost(
     request: PresignedPostRequest,
   ): Promise<PresignedPost> {
     // assinar é local (só usa as credenciais), não fala com o bucket
-    const { url, fields } = await createPresignedPost(this.client, {
+    const { url, fields } = await createPresignedPost(this.presignClient, {
       Bucket: this.settings.bucket,
       Key: request.key,
       // os Fields viram condições exatas da política: o S3 recusa outro Content-Type
@@ -180,6 +195,7 @@ export class S3ObjectStorage implements ObjectStoragePort, OnModuleDestroy {
 
   onModuleDestroy() {
     this.client.destroy();
+    if (this.presignClient !== this.client) this.presignClient.destroy();
   }
 
   private translate(error: unknown, action: string): Error {
