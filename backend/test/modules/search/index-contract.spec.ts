@@ -56,6 +56,8 @@ describe('contrato do índice de busca', () => {
       expect(mapping.capacity.type).toBe('integer');
       expect(mapping.organizer_id.type).toBe('keyword');
       expect(mapping.deleted.type).toBe('boolean');
+      // "Em breve" na busca: abertura das vendas (null = vendendo)
+      expect(mapping.sales_starts_at).toEqual({ type: 'date' });
       // só a chave: a URL depende de STORAGE_PUBLIC_URL; nunca é buscada nem agregada
       expect(mapping.cover_key).toEqual({
         type: 'keyword',

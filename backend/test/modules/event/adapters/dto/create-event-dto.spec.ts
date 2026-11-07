@@ -185,4 +185,36 @@ describe('CreateEventDto', () => {
       ).toEqual({});
     });
   });
+
+  describe('sales_starts_at', () => {
+    it('é opcional (sem ele o evento já nasce vendendo)', async () => {
+      expect(await errorsFor(validBody())).toEqual({});
+    });
+
+    it('converte para Date e aceita data futura antes do evento', async () => {
+      const body = { ...validBody(), sales_starts_at: '2026-06-20T10:00:00Z' };
+      expect(await errorsFor(body)).toEqual({});
+      expect(
+        plainToInstance(CreateEventDto, body).sales_starts_at,
+      ).toBeInstanceOf(Date);
+    });
+
+    it('rejeita data no passado', async () => {
+      expect(
+        await errorsFor({
+          ...validBody(),
+          sales_starts_at: '2026-06-01T10:00:00Z',
+        }),
+      ).toHaveProperty('sales_starts_at');
+    });
+
+    it('rejeita abertura no início do evento ou depois', async () => {
+      expect(
+        await errorsFor({
+          ...validBody(),
+          sales_starts_at: '2026-07-01T20:00:00.000Z',
+        }),
+      ).toEqual({ sales_starts_at: ['salesBeforeStart'] });
+    });
+  });
 });

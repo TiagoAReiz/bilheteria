@@ -10,7 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
-import { formatDateTime } from "@/shared/lib/format";
+import { isComingSoon } from "@/shared/lib/event-sales";
+import { formatDateTime, formatShortDateTime } from "@/shared/lib/format";
+import { FavoriteButton } from "@/modules/favorites/components/favorite-button";
 import type { EventResponse } from "@/shared/types/event";
 
 /** O que o card precisa: serve tanto para GET /events quanto para os itens da busca. */
@@ -22,11 +24,19 @@ export type EventCardData = Pick<
   cover_url?: string | null;
   /** Só a busca informa (contador aproximado); sem ele o card não mostra disponibilidade. */
   available_tickets?: number;
+  /** Início das vendas; no futuro o card mostra "Em breve" e a data de abertura. */
+  sales_starts_at?: string | null;
 };
 
 export function EventCard({ event }: { event: EventCardData }) {
+  const comingSoon = isComingSoon(event);
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="relative flex h-full flex-col">
+      <FavoriteButton
+        eventId={event.id}
+        eventName={event.name}
+        className="absolute top-3 right-3 z-10"
+      />
       {event.cover_url ? (
         // eslint-disable-next-line @next/next/no-img-element -- imagem do bucket (S3/LocalStack), sem otimização do Next
         <img
@@ -36,7 +46,7 @@ export function EventCard({ event }: { event: EventCardData }) {
           className="aspect-video w-full object-cover"
         />
       ) : null}
-      <CardHeader>
+      <CardHeader className="pr-14">
         <CardTitle className="text-lg">{event.name}</CardTitle>
         {event.description ? (
           <CardDescription className="line-clamp-2">
@@ -55,8 +65,18 @@ export function EventCard({ event }: { event: EventCardData }) {
             {formatDateTime(event.starts_at)}
           </time>
         </p>
-        {event.available_tickets ===
-        undefined ? null : event.available_tickets > 0 ? (
+        {comingSoon && event.sales_starts_at ? (
+          <div className="space-y-1">
+            <Badge>Em breve</Badge>
+            <p className="text-foreground">
+              Vendas abrem em{" "}
+              <time dateTime={event.sales_starts_at}>
+                {formatShortDateTime(event.sales_starts_at)}
+              </time>
+            </p>
+          </div>
+        ) : event.available_tickets ===
+          undefined ? null : event.available_tickets > 0 ? (
           <Badge variant="secondary">Ingressos disponíveis</Badge>
         ) : (
           <Badge variant="destructive">Esgotado</Badge>

@@ -30,6 +30,7 @@ const event: EventView = {
   max_tickets_per_cpf: 2,
   available_tickets: 10,
   cover_url: null,
+  sales_starts_at: null,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00Z'),
   updated_at: new Date('2026-01-01T00:00:00Z'),
@@ -91,6 +92,7 @@ describe('EventController', () => {
         capacity: 10,
         price_cents: 5000,
         max_tickets_per_cpf: 2,
+        sales_starts_at: undefined,
         organizer_id: 'org-1',
       });
     });

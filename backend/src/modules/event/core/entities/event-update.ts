@@ -1,5 +1,6 @@
 import { Event } from './event.entity.js';
 import { Role } from '../../../users/core/entities/role.js';
+import { isComingSoon } from './event-sales.js';
 
 /** Campos que o organizador pode mudar num evento (PATCH /events/:id); ausente = não muda. */
 export interface EventChanges {
@@ -11,6 +12,8 @@ export interface EventChanges {
   capacity?: number;
   price_cents?: number;
   max_tickets_per_cpf?: number;
+  /** null abre as vendas agora */
+  sales_starts_at?: Date | null;
 }
 
 /** Quem está editando (usuário da sessão). */
@@ -24,7 +27,9 @@ export type EventUpdateRejection =
   | 'event_started'
   | 'capacity_decrease'
   | 'limit_decrease'
-  | 'limit_above_capacity';
+  | 'limit_above_capacity'
+  | 'sales_already_open'
+  | 'sales_after_start';
 
 export type EventUpdateResult =
   | { outcome: 'updated'; event: Event }
@@ -36,7 +41,9 @@ export type EventUpdateResult =
  * - evento que já começou não muda mais;
  * - capacidade só aumenta (diminuir apagaria ingressos que podem estar reservados ou pagos);
  * - limite por CPF só aumenta (a escolha do organizador é irreversível: quem comprou contando
- *   com o limite nunca fica acima dele) e continua no máximo igual à capacidade.
+ *   com o limite nunca fica acima dele) e continua no máximo igual à capacidade;
+ * - o início das vendas só muda enquanto o evento está em breve (aberto, já pode ter venda) e
+ *   fica sempre antes do início do evento (o novo ou o atual).
  */
 export function checkEventUpdate(
   current: Event,
@@ -58,5 +65,24 @@ export function checkEventUpdate(
   const capacity = changes.capacity ?? current.capacity;
   const limit = changes.max_tickets_per_cpf ?? current.max_tickets_per_cpf;
   if (limit > capacity) return 'limit_above_capacity';
+  if (
+    changes.sales_starts_at !== undefined &&
+    timeOf(changes.sales_starts_at) !== timeOf(current.sales_starts_at) &&
+    !isComingSoon(current, now)
+  ) {
+    return 'sales_already_open';
+  }
+  const salesStartsAt =
+    changes.sales_starts_at !== undefined
+      ? changes.sales_starts_at
+      : current.sales_starts_at;
+  const startsAt = changes.starts_at ?? current.starts_at;
+  if (salesStartsAt && salesStartsAt.getTime() >= startsAt.getTime()) {
+    return 'sales_after_start';
+  }
   return null;
+}
+
+function timeOf(date: Date | null): number | null {
+  return date ? date.getTime() : null;
 }

@@ -27,6 +27,8 @@ export interface EventSearchItem {
   available_tickets: number;
   /** URL pública da capa (null: sem capa). */
   cover_url: string | null;
+  /** Início das vendas (ISO); null = vendendo. Ausente em documentos antigos do índice. */
+  sales_starts_at?: string | null;
 }
 
 export interface LocationFacet {

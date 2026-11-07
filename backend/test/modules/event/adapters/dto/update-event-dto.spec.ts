@@ -48,4 +48,25 @@ describe('UpdateEventDto', () => {
   ])('recusa %s = %p', async (field, value) => {
     expect(await errorsFor({ [field]: value })).toHaveProperty(field);
   });
+
+  describe('sales_starts_at', () => {
+    it('null abre as vendas agora', async () => {
+      expect(await errorsFor({ sales_starts_at: null })).toEqual({});
+      expect(
+        plainToInstance(UpdateEventDto, { sales_starts_at: null })
+          .sales_starts_at,
+      ).toBeNull();
+    });
+
+    it('data futura vira Date; passado é recusado', async () => {
+      expect(
+        plainToInstance(UpdateEventDto, {
+          sales_starts_at: '2026-06-20T10:00:00Z',
+        }).sales_starts_at,
+      ).toBeInstanceOf(Date);
+      expect(
+        await errorsFor({ sales_starts_at: '2026-06-01T10:00:00Z' }),
+      ).toHaveProperty('sales_starts_at');
+    });
+  });
 });

@@ -57,6 +57,28 @@ describe("<EventDetail />", () => {
     ).toBeEnabled();
   });
 
+  it("em breve: selo, data de abertura e nenhum botão de reserva", async () => {
+    svc.getEvent.mockResolvedValue(
+      makeEventDetail({
+        sales_starts_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }),
+    );
+    svc.getTicketStatus.mockResolvedValue({
+      total: 100,
+      available: 100,
+      reserved: 0,
+    });
+    render(<EventDetail eventId={1} />);
+
+    expect(await screen.findByText("Em breve")).toBeInTheDocument();
+    expect(screen.getByTestId("sales-opening")).toHaveTextContent(
+      /Vendas abrem em/,
+    );
+    expect(
+      screen.queryByRole("button", { name: /reservar ingresso/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("mostra o preço do ingresso em reais", async () => {
     svc.getEvent.mockResolvedValue(makeEventDetail({ price_cents: 8990 }));
     svc.getTicketStatus.mockResolvedValue({

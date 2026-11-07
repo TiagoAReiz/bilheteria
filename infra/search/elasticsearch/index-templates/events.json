@@ -22,6 +22,7 @@
           }
         },
         "starts_at": { "type": "date" },
+        "sales_starts_at": { "type": "date" },
         "capacity": { "type": "integer" },
         "available_tickets": { "type": "integer" },
         "cover_key": { "type": "keyword", "index": false, "doc_values": false },

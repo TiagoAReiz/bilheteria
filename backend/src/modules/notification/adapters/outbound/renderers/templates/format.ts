@@ -17,6 +17,17 @@ export function formatEventDate(iso: string): string {
   return dateFormat.format(new Date(iso));
 }
 
+const timeFormat = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** "10:00" (horário de Brasília) */
+export function formatTime(iso: string): string {
+  return timeFormat.format(new Date(iso));
+}
+
 export function formatMoney(cents: number, currency: string): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(
     cents / 100,

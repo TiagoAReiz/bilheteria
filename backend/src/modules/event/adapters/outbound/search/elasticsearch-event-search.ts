@@ -25,6 +25,8 @@ export interface EventDocument {
   starts_at: string;
   capacity: number;
   available_tickets: number;
+  // ausente nos documentos indexados antes do início de vendas programado existir
+  sales_starts_at?: string | null;
   // so a chave: a URL publica depende de STORAGE_PUBLIC_URL (a API monta)
   // (ausente nos documentos indexados antes da capa existir)
   cover_key?: string | null;
@@ -190,6 +192,9 @@ function toSearchItem(source: EventDocument): EventSearchHit {
     starts_at: new Date(source.starts_at),
     capacity: source.capacity,
     available_tickets: source.available_tickets,
+    sales_starts_at: source.sales_starts_at
+      ? new Date(source.sales_starts_at)
+      : null,
     // documentos indexados antes da capa existir nao tem o campo
     cover_key: source.cover_key ?? null,
   };

@@ -8,9 +8,11 @@ import type { NewEventFormValues } from "@/modules/new-event/types/new-event.sch
  * Capacidade e limite por CPF só podem aumentar (409 se diminuírem).
  */
 export type UpdateEventRequest = Partial<
-  Omit<CreateEventRequest, "description">
+  Omit<CreateEventRequest, "description" | "sales_starts_at">
 > & {
   description?: string | null;
+  /** null abre as vendas agora. Só muda enquanto o evento está em breve (409 depois). */
+  sales_starts_at?: string | null;
 };
 
 /** Resposta de PATCH /events/:id */
@@ -19,8 +21,17 @@ export type UpdateEventResponse = EventResponse;
 /** O formulário de edição manda todos os campos (o backend ignora os que não mudaram). */
 export function toUpdateEventRequest(
   values: NewEventFormValues,
+  { salesLocked = false }: { salesLocked?: boolean } = {},
 ): UpdateEventRequest {
   return {
+    // vendas já abertas: o campo nem vai (o backend recusaria qualquer mudança)
+    ...(salesLocked
+      ? {}
+      : {
+          sales_starts_at: values.sales_starts_at
+            ? new Date(values.sales_starts_at).toISOString()
+            : null,
+        }),
     name: values.name,
     description: values.description ? values.description : null,
     location: values.location,

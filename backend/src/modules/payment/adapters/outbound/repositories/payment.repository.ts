@@ -34,6 +34,7 @@ type CheckoutTicketRow = {
   event_name: string;
   price_cents: number | null;
   event_starts_at: Date;
+  event_sales_starts_at: Date | null;
   event_deleted: boolean;
   now: Date;
 };
@@ -67,6 +68,7 @@ export class PaymentRepository implements PaymentRepositoryPort {
       const [row] = await tx.$queryRaw<CheckoutTicketRow[]>`
                 SELECT t.id, t.user_id, t.reserved_at, t.is_paid, t.event_id,
                        e.name AS event_name, e.price_cents, e.starts_at AS event_starts_at,
+                       e.sales_starts_at AS event_sales_starts_at,
                        (e.deleted_at IS NOT NULL) AS event_deleted, NOW() AS now
                 FROM ticket AS t
                 JOIN event AS e ON e.id = t.event_id

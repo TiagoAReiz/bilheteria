@@ -118,6 +118,7 @@ describe('EventRepository', () => {
           'name',
           'organizer_id',
           'price_cents',
+          'sales_starts_at',
           'starts_at',
           'tickets',
         ].sort(),

@@ -142,6 +142,16 @@ describe('ElasticsearchEventSearch', () => {
       expect(request()).toMatchObject({ from: 20, size: 10 });
     });
 
+    it('evento em breve: sales_starts_at vira Date', async () => {
+      client.search.mockResolvedValue(
+        searchResponse([doc({ sales_starts_at: '2026-06-20T13:00:00.000Z' })]),
+      );
+      const result = await adapter.search(criteria(), NOW);
+      expect(result.items[0].sales_starts_at).toEqual(
+        new Date('2026-06-20T13:00:00.000Z'),
+      );
+    });
+
     it('mapeia itens, total e facetas', async () => {
       client.search.mockResolvedValue(
         searchResponse([doc()], { value: 57, relation: 'eq' }, [
@@ -160,6 +170,7 @@ describe('ElasticsearchEventSearch', () => {
             starts_at: new Date('2026-07-01T20:00:00.000Z'),
             capacity: 100,
             available_tickets: 40,
+            sales_starts_at: null,
             cover_key: null,
           },
         ],

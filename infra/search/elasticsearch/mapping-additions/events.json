@@ -1,5 +1,6 @@
 {
   "properties": {
-    "cover_key": { "type": "keyword", "index": false, "doc_values": false }
+    "cover_key": { "type": "keyword", "index": false, "doc_values": false },
+    "sales_starts_at": { "type": "date" }
   }
 }

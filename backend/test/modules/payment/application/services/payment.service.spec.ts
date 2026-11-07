@@ -64,6 +64,7 @@ const ticket: CheckoutTicket = {
   event_name: 'Show de Rock',
   price_cents: 5000,
   event_starts_at: new Date(NOW.getTime() + 86_400_000),
+  event_sales_starts_at: null,
   event_deleted: false,
 };
 

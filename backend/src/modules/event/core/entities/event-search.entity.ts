@@ -27,6 +27,8 @@ export interface EventSearchItem {
   capacity: number;
   // aproximado (atualizado em lote); o numero exato vem do GET /status/:id
   available_tickets: number;
+  // início das vendas; null = vendendo ("Em breve" enquanto estiver no futuro)
+  sales_starts_at: Date | null;
   // URL publica da capa (montada pela API a partir da chave indexada)
   cover_url: string | null;
 }

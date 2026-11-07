@@ -180,4 +180,41 @@ describe("<EditEventView />", () => {
     expect(screen.getByText("Evento inválido")).toBeInTheDocument();
     expect(svc.getEvent).not.toHaveBeenCalled();
   });
+
+  describe("início das vendas", () => {
+    const soon = "2099-05-01T13:00:00.000Z";
+
+    it("em breve: abrir vendas agora manda null", async () => {
+      svc.getEvent.mockResolvedValue(
+        makeEvent({ id: 1, sales_starts_at: soon }),
+      );
+      svc.update.mockResolvedValue(makeEvent({ id: 1 }));
+      render(<EditEventView />);
+
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Abrir vendas agora" }),
+      );
+
+      expect(svc.update).toHaveBeenCalledWith(1, { sales_starts_at: null });
+      expect(toast.success).toHaveBeenCalledWith("Vendas abertas!");
+      expect(push).toHaveBeenCalledWith("/events/1");
+    });
+
+    it("vendas abertas: campo travado e não vai no PATCH", async () => {
+      svc.getEvent.mockResolvedValue(makeEvent({ id: 1 }));
+      svc.update.mockResolvedValue(makeEvent({ id: 1 }));
+      render(<EditEventView />);
+
+      expect(
+        await screen.findByLabelText("Início das vendas (opcional)"),
+      ).toBeDisabled();
+      expect(
+        screen.queryByRole("button", { name: "Abrir vendas agora" }),
+      ).not.toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Salvar alterações" }),
+      );
+      expect(svc.update.mock.calls[0][1]).not.toHaveProperty("sales_starts_at");
+    });
+  });
 });

@@ -11,7 +11,9 @@ import type { EmailMetricsPort } from '../../../../../src/modules/notification/a
 import type { OutboxEmail } from '../../../../../src/modules/notification/core/entities/email.js';
 import { MAX_EMAIL_ATTEMPTS } from '../../../../../src/modules/notification/core/entities/email-retry.js';
 
-const outboxEmail = (overrides: Partial<OutboxEmail> = {}): OutboxEmail => ({
+const outboxEmail = (
+  overrides: Partial<Omit<OutboxEmail, 'kind' | 'data'>> = {},
+): OutboxEmail => ({
   id: 'mail-1',
   attempts: 1,
   kind: 'ticket_confirmed',

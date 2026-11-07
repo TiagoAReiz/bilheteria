@@ -30,6 +30,7 @@ import {
   type EventServicePort,
 } from '../../../event/application/ports/inbound/services/event.service.port.js';
 import { Event } from '../../../event/core/entities/event.entity.js';
+import { isComingSoon } from '../../../event/core/entities/event-sales.js';
 import {
   TRACING,
   type TracingPort,
@@ -41,6 +42,7 @@ type ReservationAttempt =
   | ReservationResult
   | { outcome: 'no_cpf' }
   | { outcome: 'event_started' }
+  | { outcome: 'sales_not_started'; salesStartsAt: Date }
   | { outcome: 'event_not_found'; error: NotFoundException };
 
 @Injectable()
@@ -92,6 +94,13 @@ export class TicketService implements TicketServicePort {
     if (event.starts_at.getTime() <= Date.now()) {
       return { outcome: 'event_started' };
     }
+    // "Em breve": o checkout também recusa (reserva feita antes de um adiamento)
+    if (isComingSoon(event, new Date())) {
+      return {
+        outcome: 'sales_not_started',
+        salesStartsAt: event.sales_starts_at as Date,
+      };
+    }
     // limite escolhido pelo organizador do evento
     return this.ticketRepository.reserveTicketWithinLimit(
       user_id,
@@ -113,6 +122,10 @@ export class TicketService implements TicketServicePort {
       case 'event_started':
         throw new ConflictException(
           `O evento ${event_id} já começou, as vendas estão encerradas`,
+        );
+      case 'sales_not_started':
+        throw new ConflictException(
+          `As vendas ainda não abriram: começam em ${formatSalesStart(attempt.salesStartsAt)}`,
         );
       case 'limit_reached':
         throw new ConflictException(
@@ -151,4 +164,14 @@ export class TicketService implements TicketServicePort {
       event: row.event,
     }));
   }
+}
+
+const SALES_START_FORMAT = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  dateStyle: 'short',
+  timeStyle: 'short',
+});
+
+function formatSalesStart(date: Date): string {
+  return SALES_START_FORMAT.format(date);
 }

@@ -35,7 +35,9 @@ export function TicketConfirmedEmail(props: TicketConfirmedEmailProps) {
           margin: '0 0 12px',
         }}
       >
-        {firstName ? `Pagamento aprovado, ${firstName}!` : 'Pagamento aprovado!'}
+        {firstName
+          ? `Pagamento aprovado, ${firstName}!`
+          : 'Pagamento aprovado!'}
       </Heading>
       <Text
         style={{

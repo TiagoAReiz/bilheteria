@@ -8,6 +8,7 @@ import { EventModule } from './modules/event/event.module.js';
 import { ObservabilityModule } from './modules/observability/observability.module.js';
 import { PaymentModule } from './modules/payment/payment.module.js';
 import { NotificationModule } from './modules/notification/notification.module.js';
+import { FavoriteModule } from './modules/favorite/favorite.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { NotificationModule } from './modules/notification/notification.module.j
     EventModule,
     PaymentModule,
     NotificationModule,
+    FavoriteModule,
   ],
   controllers: [],
   providers: [],

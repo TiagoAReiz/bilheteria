@@ -62,6 +62,7 @@ describe('OtelTicketMetrics', () => {
       'sold_out',
       'no_cpf',
       'event_started',
+      'sales_not_started',
       'event_not_found',
     ] as const)(
       'usa o outcome %s como único label do counter e do histograma',

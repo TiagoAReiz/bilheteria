@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarIcon,
   CalendarPlusIcon,
+  HeartIcon,
   LogOutIcon,
   TicketIcon,
   UserIcon,
@@ -18,6 +19,7 @@ import { cn } from "@/shared/lib/utils";
 const links = [
   { href: "/", label: "Eventos", icon: CalendarIcon },
   { href: "/my-tickets", label: "Minhas reservas", icon: TicketIcon },
+  { href: "/favorites", label: "Favoritos", icon: HeartIcon },
   { href: "/profile", label: "Meu perfil", icon: UserIcon },
   { href: "/events/new", label: "Criar evento", icon: CalendarPlusIcon },
 ];

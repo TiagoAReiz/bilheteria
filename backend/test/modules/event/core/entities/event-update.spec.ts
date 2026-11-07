@@ -18,6 +18,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   max_tickets_per_cpf: 2,
   available_tickets: 10,
   cover_key: null,
+  sales_starts_at: null,
   organizer_id: 'org-1',
   created_at: NOW,
   updated_at: NOW,
@@ -117,5 +118,66 @@ describe('checkEventUpdate', () => {
         NOW,
       ),
     ).toBeNull();
+  });
+
+  describe('início das vendas', () => {
+    const comingSoon = () =>
+      makeEvent({ sales_starts_at: new Date('2026-06-20T10:00:00Z') });
+
+    it('em breve: adia, antecipa ou abre agora (null)', () => {
+      for (const sales_starts_at of [
+        new Date('2026-06-25T10:00:00Z'),
+        new Date('2026-06-16T10:00:00Z'),
+        null,
+      ]) {
+        expect(
+          checkEventUpdate(comingSoon(), { sales_starts_at }, owner, NOW),
+        ).toBeNull();
+      }
+    });
+
+    it('depois de abertas, a data não muda mais', () => {
+      expect(
+        checkEventUpdate(
+          makeEvent({ sales_starts_at: new Date('2026-06-10T10:00:00Z') }),
+          { sales_starts_at: new Date('2026-06-25T10:00:00Z') },
+          owner,
+          NOW,
+        ),
+      ).toBe('sales_already_open');
+      expect(
+        checkEventUpdate(
+          makeEvent(),
+          { sales_starts_at: new Date('2026-06-25T10:00:00Z') },
+          owner,
+          NOW,
+        ),
+      ).toBe('sales_already_open');
+    });
+
+    it('reenviar o mesmo valor depois de abertas não é mudança', () => {
+      expect(
+        checkEventUpdate(makeEvent(), { sales_starts_at: null }, owner, NOW),
+      ).toBeNull();
+    });
+
+    it('abertura tem que ser antes do início do evento (novo ou atual)', () => {
+      expect(
+        checkEventUpdate(
+          comingSoon(),
+          { sales_starts_at: new Date('2026-07-01T20:00:00Z') },
+          owner,
+          NOW,
+        ),
+      ).toBe('sales_after_start');
+      expect(
+        checkEventUpdate(
+          comingSoon(),
+          { starts_at: new Date('2026-06-19T10:00:00Z') },
+          owner,
+          NOW,
+        ),
+      ).toBe('sales_after_start');
+    });
   });
 });

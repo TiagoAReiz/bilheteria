@@ -18,6 +18,8 @@ import {
   CardTitle,
 } from "@/shared/components/ui/card";
 import { Skeleton } from "@/shared/components/ui/skeleton";
+import { isComingSoon } from "@/shared/lib/event-sales";
+import { formatDateTime } from "@/shared/lib/format";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { useSession } from "@/shared/hooks/useSession";
 import type { EventResponse } from "@/shared/types/event";
@@ -143,13 +145,27 @@ function EditEvent({ eventId }: { eventId: number }) {
     );
   }
 
+  const comingSoon = isComingSoon(event);
+
   async function onSubmit(values: NewEventFormValues) {
-    const result = await update(toUpdateEventRequest(values));
+    const result = await update(
+      toUpdateEventRequest(values, { salesLocked: !comingSoon }),
+    );
     if (!result.ok) {
       toast.error(result.message);
       return;
     }
     toast.success("Evento atualizado!");
+    router.push(`/events/${eventId}`);
+  }
+
+  async function openSalesNow() {
+    const result = await update({ sales_starts_at: null });
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success("Vendas abertas!");
     router.push(`/events/${eventId}`);
   }
 
@@ -162,12 +178,33 @@ function EditEvent({ eventId }: { eventId: number }) {
           já reservou ou comprou não é afetado.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6">
+        {comingSoon && event.sales_starts_at ? (
+          <Alert>
+            <AlertTitle>Em breve</AlertTitle>
+            <AlertDescription>
+              <p>
+                As vendas abrem em {formatDateTime(event.sales_starts_at)}. Você
+                pode adiar, antecipar ou abrir agora.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                disabled={saving}
+                onClick={() => void openSalesNow()}
+              >
+                Abrir vendas agora
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <EventForm
           defaultValues={toEventFormValues(event)}
           floors={{
             minCapacity: event.capacity,
             minTicketsPerCpf: event.max_tickets_per_cpf,
+            salesLocked: !comingSoon,
           }}
           submitLabel="Salvar alterações"
           submittingLabel="Salvando..."

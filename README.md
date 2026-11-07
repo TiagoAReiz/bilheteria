@@ -22,11 +22,22 @@ Cada app é independente: tem o próprio `package.json`, lockfile, `.env` e test
 
 ## Rodando local
 
+### Tudo no Docker
+
+```bash
+cp backend/.env.example backend/.env       # preencher (ver backend/README.md)
+npm run up                   # docker compose up -d --build: infra + migrations + API + front
+```
+
+API em http://localhost:3000 e front em http://localhost:3001. O serviço `migrate` aplica as migrations pendentes antes da API subir. A API lê o `backend/.env`; o compose só troca os endereços `localhost` pelos nomes dos serviços (`db`, `elasticsearch`, `localstack`, `alloy`). O front é gerado com `NEXT_PUBLIC_API_URL=http://localhost:3000` (build arg). Depois de mudar código: `npm run up` de novo (rebuild).
+
+### Apps pelo npm (modo dev, com hot reload)
+
 ```bash
 npm run install:all          # instala backend e frontend
 cp backend/.env.example backend/.env       # preencher (ver backend/README.md)
 cp frontend/.env.example frontend/.env.local
-npm run infra:up             # Postgres, observabilidade, busca e S3 (LocalStack)
+npm run infra:up             # só a infra (Postgres, observabilidade, busca, S3), sem API/front
 cd backend && npx prisma migrate dev --config prisma7.config.ts && cd ..
 npm run dev:backend          # http://localhost:3000
 npm run dev:frontend         # http://localhost:3001 (em outro terminal)
@@ -37,7 +48,8 @@ npm run dev:frontend         # http://localhost:3001 (em outro terminal)
 | Script | O que faz |
 | --- | --- |
 | `npm run install:all` | `npm ci` nos dois apps |
-| `npm run infra:up` / `infra:down` | sobe/derruba o `docker-compose.yaml` (com os `include` de busca, pagamento e storage) |
+| `npm run up` | sobe tudo no Docker (infra + migrations + API + front), com rebuild |
+| `npm run infra:up` / `infra:down` | sobe só a infra (sem API/front) / derruba tudo |
 | `npm run dev:backend` / `dev:frontend` | sobe cada app em modo dev |
 | `npm run build` | build dos dois |
 | `npm run lint` | lint dos dois |
@@ -176,6 +188,7 @@ curl 'localhost:3000/events/suggest?q=fes'
 ### Riscos e o que monitorar
 
 - **WAL retido pelo slot**: com o Sequin parado, o Postgres guarda todo o WAL desde a última confirmação. `max_slot_wal_keep_size=2GB` limita o estrago, mas quando estoura o slot é **invalidado** (`wal_status = lost`) e é preciso recriá-lo e fazer backfill. Monitore o "retido" da query acima (alerta acima de ~1 GB) e `sequin_entity_health` no `/metrics` do Sequin.
+- **Banco `db` recriado (volume novo) com o Sequin antigo**: o Sequin guarda no `sequin-postgres` que o slot já foi criado e não cria de novo; o log repete `replication slot "bilheteria_search" does not exist`. Recrie o slot (`docker compose exec db psql -U postgres -c "select pg_create_logical_replication_slot('bilheteria_search','pgoutput');"`), limpe os documentos do banco antigo (`curl -XPOST 'localhost:9200/events,tickets/_delete_by_query' -H 'Content-Type: application/json' -d '{"query":{"match_all":{}}}'`), `docker compose restart sequin` e dispare o backfill (acima). Se depois disso eventos novos não chegarem ao índice, compare `confirmed_flush_lsn` com `pg_current_wal_lsn()` (query acima): o Sequin pode ter confirmado no slot novo a posição de WAL do banco antigo, maior que a atual, e ignora tudo abaixo dela. Avance o WAL com `select pg_switch_wal();` e dispare o backfill de novo (os POST de backfill exigem `-H 'Content-Type: application/json' -d '{}'`).
 - **Remover a busca**: o slot sobrevive ao Sequin. Ao desligar de vez: `select pg_drop_replication_slot('bilheteria_search');` (e `drop publication bilheteria_search;`).
 - **Consistência eventual**: o índice fica atrás do Postgres por alguns segundos (CDC) e o `available_tickets` por até `AVAILABILITY_REFRESH_INTERVAL_MS` + CDC. A busca mostra "Ingressos disponíveis/Esgotado"; o número exato está em `/status/:id`.
 - **Mudança de schema**: coluna nova em `event`/`ticket` não aparece no índice até a transform e o template incluírem o campo (os mappings são `dynamic: strict`: um campo inesperado vira erro visível no console do Sequin, não lixo no índice). Renomear/remover coluna usada pela transform quebra o sink: altere a transform junto com a migration.
@@ -255,10 +268,17 @@ worker (5s) ──► reserva lote (FOR UPDATE SKIP LOCKED + lease 5min) ──�
 ```
 
 - **Por que outbox**: o provedor fora do ar não derruba a confirmação do pagamento, nunca sai email de um fato que não foi gravado, e webhook repetido não duplica (a `dedupe_key`, ex. `ticket-confirmed:<paymentId>`, é única e vai como idempotency key para o provedor).
-- **Emails hoje**: ingresso confirmado (pagamento aprovado), para o comprador.
+- **Emails hoje**: ingresso confirmado (pagamento aprovado), para o comprador; e **vendas abrem em 1 hora**, para quem favoritou um evento "em breve" (ver abaixo).
 - **Provedor**: Resend, sempre (dev e produção); `RESEND_API_KEY` é obrigatória. Plano grátis: 3.000/mês, 100/dia. **Sem domínio verificado** o remetente tem que ser `onboarding@resend.dev` e o Resend **só entrega para o email da própria conta**; para qualquer outro destinatário responde 403 e o email vira `failed` (sem novas tentativas). Para enviar a usuários reais: verificar um domínio no Resend (registros SPF/DKIM no DNS) e trocar `EMAIL_FROM`.
 - **Conferir**: `SELECT kind, to_email, status, attempts, last_error FROM email_outbox ORDER BY created_at DESC;` e a métrica `bilheteria_emails_processed_total{kind, outcome}` no Prometheus.
-- **Variáveis**: `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_DISPATCH_INTERVAL_MS` (ver `backend/.env.example`).
+- **Variáveis**: `EMAIL_FROM`, `RESEND_API_KEY`, `EMAIL_DISPATCH_INTERVAL_MS`, `SALES_OPENING_INTERVAL_MS` (ver `backend/.env.example`).
+
+## Em breve e favoritos
+
+- **Início de vendas programado**: `event.sales_starts_at` (opcional na criação e na edição). Nulo = vendendo. No futuro o evento é **"Em breve"**: aparece numa seção no topo da home, na busca e na página dele com a data de abertura, mas a reserva (`409`) e o checkout (`not_on_sale`) recusam. O organizador adia, antecipa ou abre agora (`null`) enquanto estiver em breve; depois de aberto a data não muda. CHECK no banco: sempre antes de `starts_at`.
+- **Fotos na criação**: o formulário cria o evento e sobe capa e galeria em seguida pelos endpoints de imagem; o que falhar pode ser reenviado na página do evento.
+- **Favoritos** (`event_favorite`): `PUT`/`DELETE /events/:id/favorite` e `GET /favorites` (logado). Aba **Favoritos** no menu, separada em "Em breve" e "À venda".
+- **Aviso por email**: o agendador `SalesOpeningScheduler` (a cada `SALES_OPENING_INTERVAL_MS`, padrão 60s, 0 desliga) enfileira na outbox um email por favorito de evento cujas vendas abrem na próxima hora. A `dedupe_key` (`sales-opening:<evento>:<abertura ISO>:<usuário>`) evita repetir; adiar depois do aviso gera um aviso novo com a data certa. Depois da abertura nada sai (aviso atrasado não é enviado).
 
 ## Próximos passos
 

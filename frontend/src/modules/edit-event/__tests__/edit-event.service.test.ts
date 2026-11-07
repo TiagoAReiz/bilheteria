@@ -46,6 +46,31 @@ describe("toUpdateEventRequest", () => {
       capacity: 10,
       price_cents: 5000,
       max_tickets_per_cpf: 3,
+      // em breve sem data: abre as vendas agora
+      sales_starts_at: null,
     });
+  });
+
+  const values = {
+    name: "Show",
+    description: "",
+    location: "Arena",
+    starts_at: "2099-06-01T20:00",
+    capacity: 10,
+    price: "50,00",
+    max_tickets_per_cpf: 3,
+    sales_starts_at: "2099-05-01T10:00",
+  };
+
+  it("em breve: manda a data de abertura em ISO", () => {
+    expect(toUpdateEventRequest(values).sales_starts_at).toBe(
+      new Date("2099-05-01T10:00").toISOString(),
+    );
+  });
+
+  it("vendas já abertas: não manda o início das vendas", () => {
+    expect(
+      toUpdateEventRequest(values, { salesLocked: true }),
+    ).not.toHaveProperty("sales_starts_at");
   });
 });

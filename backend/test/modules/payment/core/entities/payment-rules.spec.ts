@@ -30,6 +30,7 @@ const makeTicket = (
   event_name: 'Show',
   price_cents: 5000,
   event_starts_at: new Date(NOW.getTime() + 86_400_000),
+  event_sales_starts_at: null,
   event_deleted: false,
   ...overrides,
 });
@@ -112,6 +113,11 @@ describe('payment-rules', () => {
       ['evento sem preço (anterior ao pagamento)', { price_cents: null }],
       ['evento excluído', { event_deleted: true }],
       ['evento já começou', { event_starts_at: NOW }],
+      // reserva feita antes de o organizador adiar a abertura
+      [
+        'vendas ainda não abriram',
+        { event_sales_starts_at: new Date(NOW.getTime() + 60_000) },
+      ],
     ])('not_on_sale: %s', (_caso, overrides: Partial<CheckoutTicket>) => {
       expect(checkoutBlocker(makeTicket(overrides), 'user-1', NOW)).toBe(
         'not_on_sale',

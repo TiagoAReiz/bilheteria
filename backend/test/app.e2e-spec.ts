@@ -40,6 +40,7 @@ const TEST_ENV: Record<string, string> = {
   // Resend: o client não conecta ao subir; o worker da outbox fica desligado
   RESEND_API_KEY: 're_e2e',
   EMAIL_DISPATCH_INTERVAL_MS: '0',
+  SALES_OPENING_INTERVAL_MS: '0',
 };
 
 // assina como o Mercado Pago: HMAC-SHA256 de id:<data.id>;request-id:<x-request-id>;ts:<ts>;

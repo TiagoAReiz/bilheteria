@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service.js';
 import { EmailOutboxRepositoryPort } from '../../../application/ports/outbound/repositories/email-outbox.repository.port.js';
-import { EmailRequest, OutboxEmail } from '../../../core/entities/email.js';
+import { OutboxEmail } from '../../../core/entities/email.js';
 
 type ClaimedRow = {
   id: string;
@@ -73,11 +73,11 @@ function toOutboxEmail(row: ClaimedRow): OutboxEmail {
   return {
     id: row.id,
     attempts: row.attempts,
-    kind: row.kind as EmailRequest['kind'],
+    kind: row.kind,
     to: row.to_email,
     dedupeKey: row.dedupe_key,
-    data: row.payload as EmailRequest['data'],
-  };
+    data: row.payload,
+  } as OutboxEmail;
 }
 
 function truncate(error: string): string {

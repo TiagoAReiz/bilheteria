@@ -10,6 +10,7 @@ export const PRIVATE_PATHS = [
   "/events/new",
   "/payment",
   "/my-tickets",
+  "/favorites",
 ] as const;
 
 export const LOGIN_PATH = "/login";

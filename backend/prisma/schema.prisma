@@ -50,10 +50,14 @@ model event{
     // chave do objeto da capa no bucket (events/<id>/cover/<uuid>.<ext>). Só a chave: a URL
     // pública é montada com STORAGE_PUBLIC_URL, então trocar de provedor não mexe no banco.
     cover_key String?
+    // início das vendas programado ("Em breve" enquanto estiver no futuro). Nulo = vendendo desde a
+    // criação. CHECK na migration: sempre antes de starts_at.
+    sales_starts_at DateTime?
     organizer_id String
     organizer user @relation(fields: [organizer_id], references: [id])
     tickets ticket[]
     photos event_photo[]
+    favorites event_favorite[]
     created_at DateTime @default(now())
     updated_at DateTime @updatedAt
     deleted_at DateTime?
@@ -94,8 +98,22 @@ model user {
     tickets       ticket[]
     events        event[]
     payments      payment[]
+    favorites     event_favorite[]
 
     @@map("users")
+}
+
+// Favoritos (wishlist): um por usuário e evento. Quem favorita um evento "em breve" recebe o
+// email 1 h antes da abertura das vendas (agendador do módulo notification).
+model event_favorite {
+    user_id    String
+    user       user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+    event_id   Int
+    event      event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+    created_at DateTime @default(now())
+
+    @@id([user_id, event_id])
+    @@index([event_id])
 }
 
 model session {

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { makeEvent, nestError } from "@test/helpers";
 import { EventList } from "../components/event-list";
@@ -77,5 +77,53 @@ describe("<EventList />", () => {
     expect(
       screen.queryByRole("img", { name: "Capa de Sem capa" }),
     ).not.toBeInTheDocument();
+  });
+
+  describe("Em breve", () => {
+    const soon = () => new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    it("eventos com vendas futuras vão para a seção do topo, com a data de abertura", async () => {
+      listUpcoming.mockResolvedValue([
+        makeEvent({ id: 1, name: "Festival Futuro", sales_starts_at: soon() }),
+        makeEvent({ id: 2, name: "Show Vendendo" }),
+      ]);
+      render(<EventList />);
+
+      const section = (
+        await screen.findByRole("heading", { name: "Em breve" })
+      ).closest("section") as HTMLElement;
+      expect(within(section).getByText("Festival Futuro")).toBeInTheDocument();
+      expect(within(section).getByText(/Vendas abrem em/)).toBeInTheDocument();
+      expect(within(section).queryByText("Show Vendendo")).toBeNull();
+      expect(screen.getByText("Show Vendendo")).toBeInTheDocument();
+    });
+
+    it("sem eventos em breve a seção não aparece", async () => {
+      listUpcoming.mockResolvedValue([makeEvent()]);
+      render(<EventList />);
+      await screen.findByText("Show de Rock");
+      expect(
+        screen.queryByRole("heading", { name: "Em breve" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("só eventos em breve: avisa que nada está à venda", async () => {
+      listUpcoming.mockResolvedValue([makeEvent({ sales_starts_at: soon() })]);
+      render(<EventList />);
+      expect(
+        await screen.findByText("Nenhum evento à venda no momento."),
+      ).toBeInTheDocument();
+    });
+
+    it("abertura que já passou conta como à venda", async () => {
+      listUpcoming.mockResolvedValue([
+        makeEvent({ sales_starts_at: "2020-01-01T00:00:00.000Z" }),
+      ]);
+      render(<EventList />);
+      await screen.findByText("Show de Rock");
+      expect(
+        screen.queryByRole("heading", { name: "Em breve" }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

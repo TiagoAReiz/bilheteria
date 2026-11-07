@@ -27,6 +27,8 @@ def transform(_action, record, _changes, _metadata) do
     "description" => record["description"],
     "location" => record["location"],
     "starts_at" => iso8601.(record["starts_at"]),
+    # início das vendas ("Em breve" enquanto no futuro); nil = vendendo
+    "sales_starts_at" => iso8601.(record["sales_starts_at"]),
     "capacity" => record["capacity"],
     "available_tickets" => record["available_tickets"],
     # só a chave do objeto no bucket: a API monta a URL com STORAGE_PUBLIC_URL

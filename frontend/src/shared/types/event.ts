@@ -12,6 +12,8 @@ export interface EventResponse {
   max_tickets_per_cpf: number;
   /** URL pública da capa (null: sem capa). */
   cover_url: string | null;
+  /** Início das vendas (ISO). null: vendendo. No futuro: "Em breve", sem compra até lá. */
+  sales_starts_at: string | null;
   organizer_id: string;
   created_at: string;
   updated_at: string;

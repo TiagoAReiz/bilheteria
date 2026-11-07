@@ -9,4 +9,8 @@ export type ReservationResult =
 
 // Todos os desfechos de uma tentativa de reserva: os do repositório mais as regras checadas antes dele.
 export type ReservationOutcome =
-  ReservationResult['outcome'] | 'no_cpf' | 'event_started' | 'event_not_found';
+  | ReservationResult['outcome']
+  | 'no_cpf'
+  | 'event_started'
+  | 'sales_not_started'
+  | 'event_not_found';

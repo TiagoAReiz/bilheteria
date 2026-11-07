@@ -13,6 +13,8 @@ export class Event {
   available_tickets: number;
   // chave da capa no bucket; a API responde `cover_url` (ver EventView)
   cover_key: string | null;
+  // início das vendas; null = vendendo. Em breve enquanto estiver no futuro (ver isComingSoon)
+  sales_starts_at: Date | null;
   organizer_id: string;
   created_at: Date;
   updated_at: Date;

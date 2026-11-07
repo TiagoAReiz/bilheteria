@@ -7,6 +7,10 @@ import {
   TicketConfirmedEmail,
   ticketConfirmedSubject,
 } from './templates/ticket-confirmed-email.js';
+import {
+  SalesOpeningEmail,
+  salesOpeningSubject,
+} from './templates/sales-opening-email.js';
 
 /** Monta HTML e texto puro (clientes sem HTML e filtros de spam olham os dois) com React Email. */
 @Injectable()
@@ -30,6 +34,19 @@ export class ReactEmailRenderer implements EmailRendererPort {
         );
         return {
           subject: ticketConfirmedSubject(request.data),
+          html: await render(element),
+          text: await render(element, { plainText: true }),
+        };
+      }
+      case 'sales_opening': {
+        const element = (
+          <SalesOpeningEmail
+            {...request.data}
+            eventUrl={`${this.frontendUrl}/events/${request.data.eventId}`}
+          />
+        );
+        return {
+          subject: salesOpeningSubject(request.data),
           html: await render(element),
           text: await render(element, { plainText: true }),
         };

@@ -28,7 +28,9 @@ import {
 import { Separator } from "@/shared/components/ui/separator";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useSession } from "@/shared/hooks/useSession";
+import { isComingSoon } from "@/shared/lib/event-sales";
 import { formatDateTime, formatNumber } from "@/shared/lib/format";
+import { FavoriteButton } from "@/modules/favorites/components/favorite-button";
 import { formatBRL } from "@/shared/lib/money";
 import type { User } from "@/shared/types/user";
 import { useEventDetail } from "../hooks/useEventDetail";
@@ -139,6 +141,9 @@ function EventDetailContent({
   const soldOut = ticketStatus?.available === 0;
   // evento criado antes do pagamento existir: sem preço, sem venda (o backend também recusa)
   const notOnSale = event.price_cents === null;
+  // "Em breve": o botão de compra só aparece ao recarregar depois da abertura (o servidor bloqueia
+  // de qualquer jeito)
+  const comingSoon = isComingSoon(event, openedAt);
 
   return (
     <div className="space-y-6">
@@ -162,6 +167,8 @@ function EventDetailContent({
             {notOnSale && !started ? (
               <Badge variant="secondary">Vendas indisponíveis</Badge>
             ) : null}
+            {comingSoon && !started ? <Badge>Em breve</Badge> : null}
+            <FavoriteButton eventId={event.id} eventName={event.name} />
             {canEdit && !started ? (
               <Button asChild variant="outline" size="sm" className="ml-auto">
                 <Link href={`/events/${event.id}/edit`}>
@@ -240,11 +247,29 @@ function EventDetailContent({
               error={ticketStatusError}
             />
           </section>
-          <ReserveTicketButton
-            eventId={event.id}
-            disabled={started || soldOut || notOnSale}
-            onReserved={() => void reloadTicketStatus()}
-          />
+          {comingSoon && event.sales_starts_at ? (
+            <div
+              className="rounded-lg border bg-muted/40 p-4"
+              data-testid="sales-opening"
+            >
+              <p className="font-medium">
+                Vendas abrem em{" "}
+                <time dateTime={event.sales_starts_at}>
+                  {formatDateTime(event.sales_starts_at)}
+                </time>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Favorite o evento para receber um email 1 hora antes da
+                abertura.
+              </p>
+            </div>
+          ) : (
+            <ReserveTicketButton
+              eventId={event.id}
+              disabled={started || soldOut || notOnSale}
+              onReserved={() => void reloadTicketStatus()}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

@@ -33,6 +33,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   max_tickets_per_cpf: 2,
   available_tickets: 10,
   cover_key: null,
+  sales_starts_at: null,
   organizer_id: 'org-1',
   created_at: new Date('2026-01-01T00:00:00Z'),
   updated_at: new Date('2026-01-01T00:00:00Z'),

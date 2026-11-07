@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2Icon } from "lucide-react";
@@ -34,6 +34,8 @@ interface EventFormProps {
   submittingLabel: string;
   loading: boolean;
   onSubmit: (values: NewEventFormValues) => Promise<void> | void;
+  /** Conteúdo extra antes do botão (ex.: as fotos na criação). */
+  children?: ReactNode;
 }
 
 /** Campos do evento, compartilhados entre criar e editar. */
@@ -44,13 +46,15 @@ export function EventForm({
   submittingLabel,
   loading,
   onSubmit,
+  children,
 }: EventFormProps) {
   const editing = Boolean(floors);
   const minCapacity = floors?.minCapacity ?? 1;
   const minTicketsPerCpf = floors?.minTicketsPerCpf ?? MIN_TICKETS_PER_CPF;
+  const salesLocked = floors?.salesLocked ?? false;
   const schema = useMemo(
-    () => makeEventSchema({ minCapacity, minTicketsPerCpf }),
-    [minCapacity, minTicketsPerCpf],
+    () => makeEventSchema({ minCapacity, minTicketsPerCpf, salesLocked }),
+    [minCapacity, minTicketsPerCpf, salesLocked],
   );
   const {
     register,
@@ -174,6 +178,29 @@ export function EventForm({
           />
         </div>
       </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="sales_starts_at">Início das vendas (opcional)</Label>
+        <Input
+          id="sales_starts_at"
+          type="datetime-local"
+          disabled={salesLocked}
+          aria-invalid={!!errors.sales_starts_at || undefined}
+          aria-describedby="sales_starts_at-hint sales_starts_at-error"
+          {...register("sales_starts_at")}
+        />
+        <p id="sales_starts_at-hint" className="text-sm text-muted-foreground">
+          {salesLocked
+            ? "As vendas já abriram: a data não muda mais."
+            : "Com data, o evento aparece como “Em breve” e quem favoritar recebe um email 1 hora antes da abertura. Vazio: as vendas abrem agora."}
+        </p>
+        <FieldError
+          id="sales_starts_at-error"
+          message={errors.sales_starts_at?.message}
+        />
+      </div>
+
+      {children}
 
       <Button type="submit" disabled={loading}>
         {loading ? <Loader2Icon className="animate-spin" aria-hidden /> : null}

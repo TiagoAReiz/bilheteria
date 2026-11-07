@@ -43,6 +43,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   max_tickets_per_cpf: 2,
   available_tickets: 100,
   cover_key: null,
+  sales_starts_at: null,
   organizer_id: 'org-1',
   created_at: NOW,
   updated_at: NOW,
@@ -161,6 +162,29 @@ describe('TicketService', () => {
       expect(ticketRepository.reserveTicketWithinLimit).not.toHaveBeenCalled();
     });
 
+    it('lança Conflict com a data de abertura quando as vendas ainda não abriram', async () => {
+      eventService.getEventById.mockResolvedValue(
+        makeEvent({ sales_starts_at: new Date(NOW.getTime() + 60_000) }),
+      );
+
+      await expect(service.reserveTicket('user-1', 10)).rejects.toThrow(
+        /vendas ainda não abriram/,
+      );
+      expect(ticketRepository.reserveTicketWithinLimit).not.toHaveBeenCalled();
+    });
+
+    it('reserva normalmente quando a abertura já passou', async () => {
+      eventService.getEventById.mockResolvedValue(
+        makeEvent({ sales_starts_at: new Date(NOW.getTime() - 60_000) }),
+      );
+      ticketRepository.reserveTicketWithinLimit.mockResolvedValue({
+        outcome: 'reserved',
+        ticket: makeTicket(),
+      });
+
+      await expect(service.reserveTicket('user-1', 10)).resolves.toBeDefined();
+    });
+
     it('lança Conflict quando o evento começa exatamente agora', async () => {
       eventService.getEventById.mockResolvedValue(
         makeEvent({ starts_at: new Date(NOW) }),
@@ -248,6 +272,14 @@ describe('TicketService', () => {
               makeEvent({ starts_at: new Date(NOW) }),
             ),
           'event_started',
+        ],
+        [
+          'vendas ainda não abriram',
+          () =>
+            eventService.getEventById.mockResolvedValue(
+              makeEvent({ sales_starts_at: new Date(NOW.getTime() + 60_000) }),
+            ),
+          'sales_not_started',
         ],
         [
           'limite atingido',

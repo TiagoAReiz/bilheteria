@@ -4,6 +4,7 @@ import {
   makeEventSchema,
   newEventSchema,
   toCreateEventRequest,
+  toDateTimeLocal,
   toEventFormValues,
 } from "../types/new-event.schema";
 
@@ -156,5 +157,53 @@ describe("newEventSchema", () => {
     [105, "1,05"],
   ])("centsToReaisInput(%p) = %p", (cents, text) => {
     expect(centsToReaisInput(cents)).toBe(text);
+  });
+});
+
+describe("início das vendas", () => {
+  it("é opcional", () => {
+    expect(issues({ ...valid, sales_starts_at: "" })).toEqual([]);
+  });
+
+  it("aceita data futura antes do evento e vai em ISO para a API", () => {
+    const values = { ...valid, sales_starts_at: "2099-05-01T10:00" };
+    expect(issues(values)).toEqual([]);
+    expect(
+      toCreateEventRequest(newEventSchema.parse(values)).sales_starts_at,
+    ).toBe(new Date("2099-05-01T10:00").toISOString());
+  });
+
+  it("vazio não manda o campo (vende desde a criação)", () => {
+    expect(
+      toCreateEventRequest(newEventSchema.parse(valid)),
+    ).not.toHaveProperty("sales_starts_at", expect.anything());
+  });
+
+  it("recusa abertura no passado", () => {
+    expect(issues({ ...valid, sales_starts_at: "2000-01-01T10:00" })).toEqual([
+      "sales_starts_at: O início das vendas precisa ser no futuro",
+    ]);
+  });
+
+  it("recusa abertura no início do evento ou depois", () => {
+    expect(issues({ ...valid, sales_starts_at: "2099-06-01T20:00" })).toEqual([
+      "sales_starts_at: As vendas precisam abrir antes do início do evento",
+    ]);
+  });
+
+  it("vendas já abertas (edição): não valida o campo", () => {
+    const r = makeEventSchema({ salesLocked: true }).safeParse({
+      ...valid,
+      sales_starts_at: "2000-01-01T10:00",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("evento em breve preenche o campo na edição", () => {
+    const iso = "2099-05-01T13:00:00.000Z";
+    expect(
+      toEventFormValues(makeEvent({ sales_starts_at: iso })).sales_starts_at,
+    ).toBe(toDateTimeLocal(iso));
+    expect(toEventFormValues(makeEvent()).sales_starts_at).toBe("");
   });
 });

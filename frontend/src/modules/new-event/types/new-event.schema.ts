@@ -19,11 +19,14 @@ export const DEFAULT_TICKETS_PER_CPF = 2;
 export interface EventFormFloors {
   minCapacity?: number;
   minTicketsPerCpf?: number;
+  /** Edição de evento com vendas já abertas: o início das vendas não muda mais (nem é validado). */
+  salesLocked?: boolean;
 }
 
 export function makeEventSchema({
   minCapacity = 1,
   minTicketsPerCpf = MIN_TICKETS_PER_CPF,
+  salesLocked = false,
 }: EventFormFloors = {}) {
   return (
     z
@@ -71,6 +74,8 @@ export function makeEventSchema({
               : `O limite por CPF não pode diminuir (mínimo ${minTicketsPerCpf})`,
           )
           .max(MAX_TICKETS_PER_CPF, `O limite máximo é ${MAX_TICKETS_PER_CPF}`),
+        /** Início das vendas (datetime-local). Vazio: vende desde já. */
+        sales_starts_at: z.string().optional(),
       })
       // o backend recusa limite maior que a capacidade
       // (capacidade inválida já tem o próprio erro: não repete aqui)
@@ -84,7 +89,27 @@ export function makeEventSchema({
           message: "O limite por CPF não pode ser maior que a capacidade",
         },
       )
+      .superRefine((v, ctx) => {
+        if (salesLocked || !v.sales_starts_at) return;
+        const message = salesStartError(v.sales_starts_at, v.starts_at);
+        if (message)
+          ctx.addIssue({ code: "custom", path: ["sales_starts_at"], message });
+      })
   );
+}
+
+/** O backend recusa abertura no passado ou depois (ou junto) do início do evento. */
+function salesStartError(
+  salesStartsAt: string,
+  startsAt: string,
+): string | undefined {
+  const sales = new Date(salesStartsAt).getTime();
+  if (Number.isNaN(sales)) return "Data inválida";
+  if (sales <= Date.now()) return "O início das vendas precisa ser no futuro";
+  const start = new Date(startsAt).getTime();
+  if (!Number.isNaN(start) && sales >= start)
+    return "As vendas precisam abrir antes do início do evento";
+  return undefined;
 }
 
 export const newEventSchema = makeEventSchema();
@@ -115,6 +140,9 @@ export function toCreateEventRequest(
     // o schema já garantiu um valor válido
     price_cents: parseReaisToCents(values.price) as number,
     max_tickets_per_cpf: values.max_tickets_per_cpf,
+    sales_starts_at: values.sales_starts_at
+      ? new Date(values.sales_starts_at).toISOString()
+      : undefined,
   };
 }
 
@@ -142,5 +170,8 @@ export function toEventFormValues(event: EventResponse): NewEventFormValues {
     price:
       event.price_cents === null ? "" : centsToReaisInput(event.price_cents),
     max_tickets_per_cpf: event.max_tickets_per_cpf,
+    sales_starts_at: event.sales_starts_at
+      ? toDateTimeLocal(event.sales_starts_at)
+      : "",
   };
 }

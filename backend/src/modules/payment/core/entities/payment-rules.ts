@@ -28,6 +28,8 @@ export interface CheckoutTicket extends TicketSnapshot {
   event_name: string;
   price_cents: number | null;
   event_starts_at: Date;
+  /** início das vendas; null = vendendo */
+  event_sales_starts_at: Date | null;
   event_deleted: boolean;
 }
 
@@ -66,7 +68,9 @@ export function checkoutBlocker(
   if (
     ticket.price_cents === null ||
     ticket.event_deleted ||
-    ticket.event_starts_at.getTime() <= now.getTime()
+    ticket.event_starts_at.getTime() <= now.getTime() ||
+    (ticket.event_sales_starts_at !== null &&
+      ticket.event_sales_starts_at.getTime() > now.getTime())
   ) {
     return 'not_on_sale';
   }

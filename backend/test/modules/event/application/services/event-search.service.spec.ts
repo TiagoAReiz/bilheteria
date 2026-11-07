@@ -92,6 +92,7 @@ describe('EventSearchService', () => {
       starts_at: NOW,
       capacity: 10,
       available_tickets: 5,
+      sales_starts_at: null,
     };
     eventSearch.search.mockResolvedValue({
       items: [

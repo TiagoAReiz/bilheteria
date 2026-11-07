@@ -25,6 +25,7 @@ export class EventRepository implements EventRepositoryPort {
         capacity: event.capacity,
         price_cents: event.price_cents,
         max_tickets_per_cpf: event.max_tickets_per_cpf,
+        sales_starts_at: event.sales_starts_at,
         // todos os ingressos nascem livres; daqui em diante quem mantem e o job de disponibilidade
         available_tickets: event.capacity,
         organizer_id: event.organizer_id,
@@ -80,6 +81,7 @@ export class EventRepository implements EventRepositoryPort {
           capacity: changes.capacity,
           price_cents: changes.price_cents,
           max_tickets_per_cpf: changes.max_tickets_per_cpf,
+          sales_starts_at: changes.sales_starts_at,
           // os ingressos novos nascem livres; o job de disponibilidade acerta o resto
           ...(added > 0 ? { available_tickets: { increment: added } } : {}),
         },

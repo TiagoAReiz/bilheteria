@@ -71,4 +71,16 @@ export class UpdateEventDto {
     message: `max_tickets_per_cpf deve ser no máximo ${MAX_TICKETS_PER_CPF}`,
   })
   max_tickets_per_cpf?: number;
+
+  // null abre as vendas agora; "só enquanto em breve" e "antes do evento" ficam em
+  // checkEventUpdate (dependem do valor atual)
+  @Transform(({ value }: { value: unknown }) =>
+    value === null || value === undefined ? value : new Date(value as string),
+  )
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @IsDate()
+  @MinDate(() => new Date(), {
+    message: 'sales_starts_at deve ser uma data futura',
+  })
+  sales_starts_at?: Date | null;
 }

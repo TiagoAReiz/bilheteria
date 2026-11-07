@@ -4,18 +4,23 @@ import { toast } from "sonner";
 import { makeEvent, nestError } from "@test/helpers";
 import { NewEventForm } from "../components/new-event-form";
 import { newEventService } from "../services/new-event.service";
+import { uploadEventImages } from "../services/upload-event-images";
 
 const push = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace: jest.fn() }),
 }));
 jest.mock("sonner", () => ({
-  toast: { success: jest.fn(), error: jest.fn() },
+  toast: { success: jest.fn(), error: jest.fn(), warning: jest.fn() },
+}));
+jest.mock("../services/upload-event-images", () => ({
+  uploadEventImages: jest.fn(),
 }));
 jest.mock("../services/new-event.service", () => ({
   newEventService: { create: jest.fn() },
 }));
 const create = jest.mocked(newEventService.create);
+const uploadImages = jest.mocked(uploadEventImages);
 
 async function fillValid() {
   await userEvent.type(screen.getByLabelText("Nome"), "Festival");
@@ -138,5 +143,79 @@ describe("<NewEventForm />", () => {
     expect(toast.error).toHaveBeenCalledWith(
       "starts_at deve ser uma data futura",
     );
+  });
+
+  describe("fotos na criação", () => {
+    it("sobe a capa e a galeria depois de criar e vai para o evento", async () => {
+      create.mockResolvedValue(makeEvent({ id: 33 }));
+      uploadImages.mockResolvedValue([]);
+      render(<NewEventForm />);
+      await fillValid();
+      const cover = new File(["x"], "capa.png", { type: "image/png" });
+      const photo = new File(["x"], "foto.png", { type: "image/png" });
+      await userEvent.upload(screen.getByLabelText("Escolher capa"), cover);
+      await userEvent.upload(screen.getByLabelText("Adicionar foto"), photo);
+      expect(screen.getByText("Galeria (opcional, 1/10)")).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Criar evento" }),
+      );
+
+      expect(uploadImages).toHaveBeenCalledWith(33, {
+        cover,
+        photos: [photo],
+      });
+      expect(toast.success).toHaveBeenCalledWith("Evento criado com sucesso!");
+      expect(push).toHaveBeenCalledWith("/events/33");
+    });
+
+    it("sem imagens não chama o upload", async () => {
+      create.mockResolvedValue(makeEvent({ id: 33 }));
+      render(<NewEventForm />);
+      await fillValid();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Criar evento" }),
+      );
+      expect(push).toHaveBeenCalledWith("/events/33");
+      expect(uploadImages).not.toHaveBeenCalled();
+    });
+
+    it("foto que falha: evento continua criado, avisa e leva para a página dele", async () => {
+      create.mockResolvedValue(makeEvent({ id: 33 }));
+      uploadImages.mockResolvedValue([
+        { name: "capa.png", message: "O armazenamento recusou a imagem." },
+      ]);
+      render(<NewEventForm />);
+      await fillValid();
+      await userEvent.upload(
+        screen.getByLabelText("Escolher capa"),
+        new File(["x"], "capa.png", { type: "image/png" }),
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: "Criar evento" }),
+      );
+
+      expect(toast.warning).toHaveBeenCalledWith(
+        expect.stringContaining("1 imagem não foi enviada"),
+      );
+      expect(push).toHaveBeenCalledWith("/events/33");
+    });
+
+    it("manda o início das vendas quando preenchido", async () => {
+      create.mockResolvedValue(makeEvent({ id: 33 }));
+      render(<NewEventForm />);
+      await fillValid();
+      fireEvent.input(screen.getByLabelText("Início das vendas (opcional)"), {
+        target: { value: "2099-05-01T10:00" },
+      });
+      await userEvent.click(
+        screen.getByRole("button", { name: "Criar evento" }),
+      );
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sales_starts_at: new Date("2099-05-01T10:00").toISOString(),
+        }),
+      );
+    });
   });
 });

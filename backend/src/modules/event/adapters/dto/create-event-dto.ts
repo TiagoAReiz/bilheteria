@@ -38,6 +38,22 @@ class NotAboveCapacity implements ValidatorConstraintInterface {
   }
 }
 
+/** A abertura das vendas é antes do início do evento. */
+@ValidatorConstraint({ name: 'salesBeforeStart' })
+class SalesBeforeStart implements ValidatorConstraintInterface {
+  validate(value: unknown, args: ValidationArguments): boolean {
+    const startsAt = (args.object as { starts_at?: unknown }).starts_at;
+    return (
+      !(value instanceof Date) ||
+      !(startsAt instanceof Date) ||
+      value.getTime() < startsAt.getTime()
+    );
+  }
+  defaultMessage(): string {
+    return 'sales_starts_at deve ser antes do início do evento';
+  }
+}
+
 export class CreateEventDto {
   @IsString()
   @IsNotEmpty()
@@ -81,4 +97,14 @@ export class CreateEventDto {
   })
   @Validate(NotAboveCapacity)
   max_tickets_per_cpf: number;
+
+  // início das vendas ("Em breve" até lá); ausente = vende desde a criação
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  @MinDate(() => new Date(), {
+    message: 'sales_starts_at deve ser uma data futura',
+  })
+  @Validate(SalesBeforeStart)
+  sales_starts_at?: Date;
 }

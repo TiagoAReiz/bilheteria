@@ -13,6 +13,8 @@ export interface CreateEventRequest {
   price_cents: number;
   /** Ingressos ativos (pagos ou reservados) por CPF neste evento: 1..10, até a capacidade. */
   max_tickets_per_cpf: number;
+  /** Início das vendas (ISO, futuro e antes de starts_at). Ausente: vende desde a criação. */
+  sales_starts_at?: string;
 }
 
 /** Resposta de POST /events */

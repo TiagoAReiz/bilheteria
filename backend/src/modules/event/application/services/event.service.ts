@@ -109,6 +109,14 @@ export class EventService implements EventServicePort {
         return new ConflictException(
           'O limite de ingressos por CPF não pode ser maior que a capacidade',
         );
+      case 'sales_already_open':
+        return new ConflictException(
+          'As vendas já abriram; a data de início das vendas não muda mais',
+        );
+      case 'sales_after_start':
+        return new ConflictException(
+          'O início das vendas tem que ser antes do início do evento',
+        );
     }
   }
 

@@ -8,6 +8,11 @@ import { ReactEmailRenderer } from './adapters/outbound/renderers/react-email-re
 import { OtelEmailMetrics } from './adapters/outbound/metrics/otel-email-metrics.js';
 import { ResendEmailSender } from './adapters/outbound/senders/resend-email-sender.js';
 import { EmailOutboxScheduler } from './adapters/inbound/schedulers/email-outbox.scheduler.js';
+import { SalesOpeningScheduler } from './adapters/inbound/schedulers/sales-opening.scheduler.js';
+import { SalesOpeningService } from './application/services/sales-opening.service.js';
+import { SalesOpeningRepository } from './adapters/outbound/repositories/sales-opening.repository.js';
+import { SALES_OPENING_SERVICE } from './application/ports/inbound/services/sales-opening.service.port.js';
+import { SALES_OPENING_REPOSITORY } from './application/ports/outbound/repositories/sales-opening.repository.port.js';
 import { EMAIL_DISPATCH_SERVICE } from './application/ports/inbound/services/email-dispatch.service.port.js';
 import { EMAIL_OUTBOX_REPOSITORY } from './application/ports/outbound/repositories/email-outbox.repository.port.js';
 import { EMAIL_RENDERER } from './application/ports/outbound/renderers/email-renderer.port.js';
@@ -31,6 +36,9 @@ import { EMAIL_METRICS } from './application/ports/outbound/metrics/email-metric
       inject: [ConfigService],
     },
     EmailOutboxScheduler,
+    { provide: SALES_OPENING_SERVICE, useClass: SalesOpeningService },
+    { provide: SALES_OPENING_REPOSITORY, useClass: SalesOpeningRepository },
+    SalesOpeningScheduler,
   ],
   imports: [PrismaModule, ObservabilityModule],
 })
