@@ -22,6 +22,64 @@ services:
     # apaga junto com o contêiner (os dados somem). A partir do 18 o diretório é /var/lib/postgresql.
     volumes:
       - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---------------------------------------------------------------------------
+  # Aplicação. Segredos e configs vêm do backend/.env (o mesmo do `npm run start:dev`); o
+  # `environment` só troca os endereços "localhost" pelos nomes dos serviços na rede do compose.
+  # As URLs que o NAVEGADOR usa (BETTER_AUTH_URL, FRONTEND_URL, STORAGE_PUBLIC_URL) continuam
+  # em localhost. Rodar a API/front pelo npm ao mesmo tempo dá conflito nas portas 3000/3001:
+  #   docker compose up -d --scale api=0 --scale frontend=0   (só a infra)
+  # ---------------------------------------------------------------------------
+
+  # aplica as migrations pendentes e sai; a API só sobe depois que ele termina com sucesso
+  migrate:
+    build:
+      context: ./backend
+      target: build
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      STORAGE_S3_ENDPOINT: http://localstack:4566
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      elasticsearch:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3000
+    restart: unless-stopped
+    ports:
+      - 3001:3001
+    depends_on:
+      - api
 
   # ---------------------------------------------------------------------------
   # Observabilidade (Grafana LGTM). Configs em infra/. Fluxo:

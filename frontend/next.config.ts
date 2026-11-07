@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // build enxuto para a imagem Docker (frontend/Dockerfile); não muda o `next dev`
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

@@ -1,0 +1,8 @@
+node_modules
+.next
+.swc
+coverage
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

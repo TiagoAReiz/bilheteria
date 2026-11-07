@@ -4,7 +4,8 @@
   "description": "Monorepo da bilheteria: API NestJS (backend/) e app Next.js (frontend/)",
   "scripts": {
     "install:all": "npm ci --prefix backend && npm ci --prefix frontend",
-    "infra:up": "docker compose up -d",
+    "up": "docker compose up -d --build",
+    "infra:up": "docker compose up -d --scale api=0 --scale frontend=0",
     "infra:down": "docker compose down",
     "dev:backend": "npm run start:dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
